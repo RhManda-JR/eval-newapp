@@ -1,20 +1,46 @@
-import { Button } from "@/components/ui/button"
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+
+import { AppLayout } from "@/components/app-layout"
+import { BackofficeGuard } from "@/components/backoffice-guard"
+import { FrontLayout } from "@/components/front-layout"
+import { BackofficeDashboardPage } from "@/pages/backoffice/dashboard"
+import { BackofficeImportPage } from "@/pages/backoffice/import"
+import { BackofficeLoginPage } from "@/pages/backoffice/login"
+import { BackofficeTicketDetailPage } from "@/pages/backoffice/ticket-detail"
+import { BackofficeCostsPage } from "@/pages/backoffice/costs"
+import { BackofficeTicketsPage } from "@/pages/backoffice/tickets"
+import { ResetPage } from "@/pages/reset"
+import { CreateTicketPage } from "@/pages/front/create-ticket"
+import { ElementsPage } from "@/pages/front/elements"
 
 export function App() {
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">Project ready!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        <div className="font-mono text-xs text-muted-foreground">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<FrontLayout />}>
+          <Route index element={<ElementsPage />} />
+          <Route path="ticket/nouveau" element={<CreateTicketPage />} />
+        </Route>
+
+        <Route path="backoffice/entree" element={<BackofficeLoginPage />} />
+
+        <Route element={<BackofficeGuard />}>
+          <Route element={<AppLayout />}>
+            <Route path="backoffice" element={<BackofficeDashboardPage />} />
+            <Route path="backoffice/import" element={<BackofficeImportPage />} />
+            <Route path="backoffice/reset" element={<ResetPage />} />
+            <Route path="backoffice/tickets" element={<BackofficeTicketsPage />} />
+            <Route path="backoffice/couts" element={<BackofficeCostsPage />} />
+            <Route
+              path="backoffice/tickets/:id"
+              element={<BackofficeTicketDetailPage />}
+            />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
