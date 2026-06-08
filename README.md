@@ -15,6 +15,12 @@ Application web de gestion de parc informatique et de tickets, connectée à **G
 
 > **Windows** : `better-sqlite3` compile un module natif. Si `npm install` échoue, installez [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) avec la charge de travail **Développement Desktop en C++**.
 
+> **Important** : `better-sqlite3` doit être compilé avec **la même version de Node.js** que celle utilisée pour lancer l'app. Après un changement de version Node, arrêtez `npm run dev` puis exécutez :
+>
+> ```bash
+> npm run rebuild:native
+> ```
+
 ## Installation
 
 ```bash
