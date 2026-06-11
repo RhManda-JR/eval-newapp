@@ -3,7 +3,6 @@ import {
   Columns3Icon,
   HeadsetIcon,
   LayoutGridIcon,
-  PlusCircleIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,13 +28,6 @@ export function FrontLayout() {
               <Link to="/kanban">
                 <Columns3Icon data-icon="inline-start" />
                 Kanban
-              </Link>
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/ticket/nouveau">
-                <PlusCircleIcon data-icon="inline-start" />
-                <span className="hidden sm:inline">Nouveau ticket</span>
-                <span className="sm:hidden">Ticket</span>
               </Link>
             </Button>
           </nav>

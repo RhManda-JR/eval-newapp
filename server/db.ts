@@ -69,7 +69,7 @@ const defaults: Record<string, string> = {
   glpi_password: "glpi",
   backoffice_code: "JUIN26",
   kanban_color_new: "#dbeafe",
-  kanban_color_in_progress: "#fef08a",
+  kanban_color_in_progress: "#ffedd5",
   kanban_color_closed: "#bbf7d0",
   kanban_label_new_mg: "vaovao",
   kanban_label_in_progress_mg: "efa manao",

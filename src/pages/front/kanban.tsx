@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { GripVerticalIcon, Loader2Icon, PlusIcon } from "lucide-react"
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import { CSS } from "@dnd-kit/utilities"
+import { Loader2Icon, PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -29,12 +34,25 @@ import {
   type KanbanConfig,
   type TicketFeuille2Row,
 } from "@/lib/api"
+import { cn } from "@/lib/utils"
 
 type PendingMove = {
   ticket: TicketFeuille2Row
   fromStatus: number
   toStatus: number
 }
+
+const COLUMN_DISPLAY_LABELS: Record<number, string> = {
+  1: "Nouveau",
+  2: "In progress",
+  6: "Terminé",
+}
+
+const DEFAULT_COLUMN_COLORS = {
+  new: "#dbeafe",
+  in_progress: "#ffedd5",
+  closed: "#dcfce7",
+} as const
 
 function parseItems(raw: string): string[] {
   try {
@@ -45,15 +63,173 @@ function parseItems(raw: string): string[] {
   }
 }
 
+function ticketCardLabel(ticket: TicketFeuille2Row) {
+  return ticket.titre.trim() || `Ticket ${ticket.ref_ticket}`
+}
+
+function ticketDragId(ticketId: number) {
+  return `ticket-${ticketId}`
+}
+
+function columnDropId(statusId: number) {
+  return `column-${statusId}`
+}
+
+type KanbanCardViewProps = {
+  ticket: TicketFeuille2Row
+  isOverlay?: boolean
+  className?: string
+}
+
+function KanbanCardView({ ticket, isOverlay = false, className }: KanbanCardViewProps) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl bg-white px-4 py-3 text-sm font-medium text-foreground shadow-sm",
+        isOverlay
+          ? "scale-[1.03] rotate-1 cursor-grabbing shadow-xl ring-1 ring-black/5"
+          : className
+      )}
+    >
+      {ticketCardLabel(ticket)}
+    </div>
+  )
+}
+
+type KanbanCardProps = {
+  ticket: TicketFeuille2Row
+  isDragging?: boolean
+  onOpen: (ticket: TicketFeuille2Row) => void
+}
+
+function KanbanCard({ ticket, isDragging = false, onOpen }: KanbanCardProps) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: ticketDragId(ticket.id),
+    data: { ticket },
+  })
+
+  const style = transform
+    ? { transform: CSS.Translate.toString(transform) }
+    : undefined
+
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="rounded-xl border-2 border-dashed border-white/70 bg-white/25 px-4 py-3 shadow-none"
+        aria-hidden
+      >
+        <span className="invisible text-sm font-medium">
+          {ticketCardLabel(ticket)}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      role="button"
+      tabIndex={0}
+      className="touch-none cursor-grab rounded-xl bg-white px-4 py-3 text-sm font-medium text-foreground shadow-sm transition-[box-shadow,transform,opacity] duration-200 hover:shadow-md active:cursor-grabbing"
+      onClick={() => onOpen(ticket)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onOpen(ticket)
+        }
+      }}
+    >
+      {ticketCardLabel(ticket)}
+    </div>
+  )
+}
+
+type KanbanColumnProps = {
+  statusId: number
+  displayLabel: string
+  color: string
+  tickets: TicketFeuille2Row[]
+  activeTicketId: number | null
+  onOpen: (ticket: TicketFeuille2Row) => void
+  showAddButton?: boolean
+}
+
+function KanbanColumn({
+  statusId,
+  displayLabel,
+  color,
+  tickets,
+  activeTicketId,
+  onOpen,
+  showAddButton,
+}: KanbanColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: columnDropId(statusId),
+    data: { statusId },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex min-h-[26rem] flex-col rounded-2xl p-4 shadow-sm transition-[box-shadow,transform] duration-200",
+        isOver && "scale-[1.01] shadow-md ring-2 ring-white/80 ring-offset-2"
+      )}
+      style={{ backgroundColor: color }}
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-foreground">{displayLabel}</h2>
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-xs font-medium text-foreground/80 shadow-sm">
+          {tickets.length}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3">
+        {tickets.map((ticket) => (
+          <KanbanCard
+            key={ticket.id}
+            ticket={ticket}
+            isDragging={activeTicketId === ticket.id}
+            onOpen={onOpen}
+          />
+        ))}
+      </div>
+
+      {showAddButton ? (
+        <Button
+          asChild
+          variant="ghost"
+          className="mt-4 h-10 w-full justify-center rounded-xl bg-white/60 text-sm font-normal text-foreground shadow-sm hover:bg-white/80"
+        >
+          <Link to="/ticket/nouveau">
+            <PlusIcon data-icon="inline-start" />
+            Ajouter 1 ticket
+          </Link>
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
 export function KanbanPage() {
   const [tickets, setTickets] = useState<TicketFeuille2Row[]>([])
   const [config, setConfig] = useState<KanbanConfig | null>(null)
   const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
-  const [draggingId, setDraggingId] = useState<number | null>(null)
+  const [activeTicket, setActiveTicket] = useState<TicketFeuille2Row | null>(null)
   const [detailTicket, setDetailTicket] = useState<TicketFeuille2Row | null>(null)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [statusComment, setStatusComment] = useState("")
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    })
+  )
 
   const loadBoard = useCallback(async () => {
     const [ticketRows, kanbanConfig] = await Promise.all([
@@ -73,6 +249,7 @@ export function KanbanPage() {
   const columns = useMemo(() => {
     return KANBAN_COLUMNS.map((column) => ({
       ...column,
+      displayLabel: COLUMN_DISPLAY_LABELS[column.statusId] ?? column.label,
       tickets: tickets.filter(
         (ticket) =>
           ticketStatusToKanbanId(ticket.status, ticket.status_id) ===
@@ -81,50 +258,65 @@ export function KanbanPage() {
     }))
   }, [tickets])
 
+  function columnColor(colorKey: keyof KanbanConfig["colors"]) {
+    return config?.colors[colorKey] ?? DEFAULT_COLUMN_COLORS[colorKey]
+  }
+
   function requiresComment(fromStatus: number, toStatus: number) {
     return toStatus === 6 && fromStatus !== 6
   }
 
-  async function applyStatusChange(
+  function applyStatusChangeOptimistic(
     ticket: TicketFeuille2Row,
     toStatus: number,
     comment?: string
   ) {
-    setUpdating(true)
-    try {
-      await api.updateTicketStatus(ticket.id, { status: toStatus, comment })
-      const nextStatus =
-        KANBAN_COLUMNS.find((c) => c.statusId === toStatus)?.label ?? ticket.status
+    const previousTickets = tickets
+    const nextStatus =
+      KANBAN_COLUMNS.find((c) => c.statusId === toStatus)?.label ?? ticket.status
 
-      setTickets((prev) =>
-        prev.map((row) =>
-          row.id === ticket.id
-            ? {
-                ...row,
-                status: nextStatus,
-                status_id: toStatus,
-                close_comment:
-                  toStatus === 6 ? (comment?.trim() ?? row.close_comment) : "",
-              }
-            : row
+    setTickets((prev) =>
+      prev.map((row) =>
+        row.id === ticket.id
+          ? {
+              ...row,
+              status: nextStatus,
+              status_id: toStatus,
+              close_comment:
+                toStatus === 6 ? (comment?.trim() ?? row.close_comment) : "",
+            }
+          : row
+      )
+    )
+
+    void api
+      .updateTicketStatus(ticket.id, { status: toStatus, comment })
+      .catch((error) => {
+        setTickets(previousTickets)
+        toast.error(
+          error instanceof Error ? error.message : "Mise à jour échouée"
         )
-      )
-      toast.success("Statut mis à jour")
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Mise à jour échouée"
-      )
-    } finally {
-      setUpdating(false)
-      setPendingMove(null)
-      setStatusComment("")
-    }
+      })
   }
 
-  function handleDrop(targetStatus: number) {
-    if (draggingId == null) return
-    const ticket = tickets.find((row) => row.id === draggingId)
-    if (!ticket) return
+  function handleDragStart(event: DragStartEvent) {
+    const ticket = event.active.data.current?.ticket as
+      | TicketFeuille2Row
+      | undefined
+    if (ticket) setActiveTicket(ticket)
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveTicket(null)
+
+    const ticket = event.active.data.current?.ticket as
+      | TicketFeuille2Row
+      | undefined
+    const targetStatus = event.over?.data.current?.statusId as
+      | number
+      | undefined
+
+    if (!ticket || targetStatus == null) return
 
     const fromStatus = ticketStatusToKanbanId(ticket.status, ticket.status_id)
     if (fromStatus === targetStatus) return
@@ -134,120 +326,60 @@ export function KanbanPage() {
       return
     }
 
-    void applyStatusChange(ticket, targetStatus)
+    applyStatusChangeOptimistic(ticket, targetStatus)
+  }
+
+  function handleDragCancel() {
+    setActiveTicket(null)
+  }
+
+  function confirmCloseTicket() {
+    if (!pendingMove || !statusComment.trim()) return
+
+    applyStatusChangeOptimistic(
+      pendingMove.ticket,
+      pendingMove.toStatus,
+      statusComment.trim()
+    )
+    setPendingMove(null)
+    setStatusComment("")
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Tableau Kanban
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Glissez les tickets entre les colonnes pour changer leur statut.
-          </p>
-        </div>
-        <Button asChild>
-          <Link to="/ticket/nouveau">
-            <PlusIcon data-icon="inline-start" />
-            Ajouter 1 ticket
-          </Link>
-        </Button>
-      </div>
-
-      {updating ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="overflow-hidden rounded-lg border bg-background/95 shadow-sm backdrop-blur"
-        >
-          <div className="h-1 overflow-hidden bg-muted">
-            <div className="h-full animate-pulse bg-primary" />
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-            <Loader2Icon className="size-4 shrink-0 animate-spin text-primary" />
-            Mise à jour du statut en cours…
-          </div>
-        </div>
-      ) : null}
-
+    <div className="flex flex-col gap-4">
       {loading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground">
           <Loader2Icon className="mr-2 size-5 animate-spin" />
           Chargement…
         </div>
       ) : (
-        <div
-          className={`grid gap-4 transition-opacity lg:grid-cols-3 ${updating ? "pointer-events-none opacity-60" : ""}`}
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
-          {columns.map((column) => (
-            <div
-              key={column.statusId}
-              className="flex min-h-[28rem] flex-col rounded-xl border p-3"
-              style={{
-                backgroundColor:
-                  config?.colors[column.colorKey] ?? "var(--muted)",
-              }}
-              onDragOver={(event) => {
-                event.preventDefault()
-                event.dataTransfer.dropEffect = "move"
-              }}
-              onDrop={(event) => {
-                event.preventDefault()
-                handleDrop(column.statusId)
-                setDraggingId(null)
-              }}
-            >
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h2 className="font-semibold">{column.label}</h2>
-                  {config ? (
-                    <p className="text-xs text-muted-foreground">
-                      {config.labels_mg[column.labelMgKey]}
-                    </p>
-                  ) : null}
-                </div>
-                <Badge variant="secondary">{column.tickets.length}</Badge>
-              </div>
+          <div className="grid gap-5 lg:grid-cols-3">
+            {columns.map((column) => (
+              <KanbanColumn
+                key={column.statusId}
+                statusId={column.statusId}
+                displayLabel={column.displayLabel}
+                color={columnColor(column.colorKey)}
+                tickets={column.tickets}
+                activeTicketId={activeTicket?.id ?? null}
+                onOpen={setDetailTicket}
+                showAddButton={column.statusId === 1}
+              />
+            ))}
+          </div>
 
-              <div className="flex flex-1 flex-col gap-2">
-                {column.tickets.map((ticket) => (
-                  <Card
-                    key={ticket.id}
-                    draggable={!updating}
-                    className="cursor-grab shadow-sm active:cursor-grabbing"
-                    onDragStart={() => setDraggingId(ticket.id)}
-                    onDragEnd={() => setDraggingId(null)}
-                    onClick={() => setDetailTicket(ticket)}
-                  >
-                    <CardHeader className="p-3 pb-1">
-                      <CardTitle className="flex items-start gap-2 text-sm">
-                        <GripVerticalIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                        <span className="line-clamp-2">{ticket.titre}</span>
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        #{ticket.ref_ticket} · {ticket.type}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 text-xs text-muted-foreground">
-                      <p className="line-clamp-2">{ticket.description}</p>
-                      {ticket.status === "Closed" && ticket.close_comment ? (
-                        <p className="mt-2 line-clamp-2 rounded-md bg-background/70 p-2 text-foreground">
-                          <span className="font-medium">Résolution :</span>{" "}
-                          {ticket.close_comment}
-                        </p>
-                      ) : null}
-                      <p className="mt-2">
-                        {ticket.date} {ticket.heure}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+          <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(0.18, 0.67, 0.6, 1)" }}>
+            {activeTicket ? (
+              <KanbanCardView ticket={activeTicket} isOverlay />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       <Dialog
@@ -340,20 +472,10 @@ export function KanbanPage() {
               Annuler
             </Button>
             <Button
-              disabled={!statusComment.trim() || updating}
-              onClick={() => {
-                if (!pendingMove) return
-                void applyStatusChange(
-                  pendingMove.ticket,
-                  pendingMove.toStatus,
-                  statusComment.trim()
-                )
-              }}
+              disabled={!statusComment.trim()}
+              onClick={confirmCloseTicket}
             >
-              {updating ? (
-                <Loader2Icon className="animate-spin" data-icon="inline-start" />
-              ) : null}
-              {updating ? "Mise à jour…" : "Confirmer"}
+              Confirmer
             </Button>
           </DialogFooter>
         </DialogContent>
