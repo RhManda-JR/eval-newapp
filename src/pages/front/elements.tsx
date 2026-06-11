@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import { Loader2Icon, SearchIcon } from "lucide-react"
 
-import { LoadingOverlay } from "@/components/loading-overlay"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -102,12 +101,7 @@ export function ElementsPage() {
   const loading = initialLoading || searching
 
   return (
-    <div className="relative flex flex-col gap-6">
-      <LoadingOverlay
-        open={searching}
-        title="Recherche en cours…"
-        description="Synchronisation GLPI et filtrage du parc."
-      />
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           Parc informatique

@@ -24,6 +24,49 @@ const TICKET_TYPE: Record<number, string> = {
   2: "Demande",
 }
 
+/** Libellés attendus dans le fichier d'import Feuille-2. */
+const FEUILLE2_STATUS: Record<number, string> = {
+  1: "New",
+  2: "In progress (assigned)",
+  3: "In progress (planned)",
+  4: "Pending",
+  5: "Solved",
+  6: "Closed",
+}
+
+function mapImportTicketStatus(raw: string): number {
+  const normalized = raw?.trim().toLowerCase() ?? ""
+
+  const statuses: Record<string, number> = {
+    new: 1,
+    "in progress (assigned)": 2,
+    closed: 6,
+    // Alias / rétrocompatibilité
+    nouveau: 1,
+    incoming: 1,
+    processing: 2,
+    assigned: 2,
+    "en cours (attribué)": 2,
+    "en cours (assigné)": 2,
+    "en cours": 2,
+    "in progress": 2,
+    planned: 3,
+    planifie: 3,
+    planifié: 3,
+    "in progress (planned)": 3,
+    pending: 4,
+    "en attente": 4,
+    solved: 5,
+    resolu: 5,
+    résolu: 5,
+    clos: 6,
+    ferme: 6,
+    fermé: 6,
+  }
+
+  return statuses[normalized] ?? 1
+}
+
 const MODEL_CONFIG: Record<
   string,
   { modelItemtype: string; field: string }
@@ -229,7 +272,7 @@ async function withSession<T>(
   }
 }
 
-async function listAllItems<T extends { id: number }>(
+async function listAllItems<T extends Record<string, unknown>>(
   sessionToken: string,
   url: string,
   itemtype: string,
@@ -774,10 +817,13 @@ export async function createTicketWithItems(input: {
     const itemNames = input.items
       .map((item) => item.name?.trim())
       .filter((name): name is string => Boolean(name))
-    const content =
-      itemNames.length > 0
-        ? `${input.content.trim()}\nÉléments: ${itemNames.join(", ")}`
-        : input.content
+    const body = input.content.trim()
+    const contentLines = [
+      body,
+      `Status: ${FEUILLE2_STATUS[input.status ?? 1] ?? "New"}`,
+      itemNames.length > 0 ? `Éléments: ${itemNames.join(", ")}` : "",
+    ].filter(Boolean)
+    const content = contentLines.join("\n")
 
     const ticketInput: Record<string, unknown> = {
       name: input.name,
@@ -789,7 +835,6 @@ export async function createTicketWithItems(input: {
       entities_id: entityId,
       global_validation: 1,
       _users_id_requester: requesterId,
-      _users_id_assign: requesterId,
     }
     if (input.externalid) ticketInput.externalid = input.externalid
 
@@ -802,8 +847,10 @@ export async function createTicketWithItems(input: {
       body: JSON.stringify({ input: ticketInput }),
     })
 
-    const ticketData = await ticketRes.json()
-    if (!ticketRes.ok || !ticketData?.id) {
+    const ticketData = (await ticketRes.json()) as
+      | { id?: number }
+      | [string, string]
+    if (!ticketRes.ok || !ticketData || Array.isArray(ticketData) || !ticketData.id) {
       throw new Error(
         Array.isArray(ticketData) ? String(ticketData[1]) : "Création ticket échouée"
       )
@@ -1190,4 +1237,126 @@ export async function uploadAssetImagesToGlpi(
   })
 }
 
-export { TICKET_STATUS, TICKET_TYPE }
+export const KANBAN_STATUS_IDS = [1, 2, 6] as const
+
+export function normalizeTicketStatusId(raw: unknown): number {
+  const numeric = Number(raw)
+  if (!Number.isNaN(numeric) && numeric > 0) {
+    if (numeric === 1) return 1
+    if (numeric === 2 || numeric === 3 || numeric === 4) return 2
+    if (numeric === 5 || numeric === 6) return 6
+  }
+
+  const label = String(raw ?? "").trim().toLowerCase()
+  if (!label) return 1
+  if (label === "new" || label === "nouveau" || label === "1") return 1
+  if (
+    label === "2" ||
+    label.includes("in progress") ||
+    label.includes("processing") ||
+    label.includes("planned") ||
+    label.includes("pending") ||
+    label.includes("en cours") ||
+    label.includes("attente")
+  ) {
+    return 2
+  }
+  if (
+    label === "6" ||
+    label === "5" ||
+    label.includes("closed") ||
+    label.includes("clos") ||
+    label.includes("fermé") ||
+    label.includes("solved") ||
+    label.includes("résolu")
+  ) {
+    return 6
+  }
+
+  return 1
+}
+
+function updateContentStatusLine(content: string, statusLabel: string) {
+  const lines = content.length > 0 ? content.split(/\r?\n/) : []
+  let found = false
+
+  const updated = lines.map((line) => {
+    if (line.startsWith("Status:") || line.startsWith("Statut:")) {
+      found = true
+      return `Status: ${statusLabel}`
+    }
+    return line
+  })
+
+  if (!found && content.trim()) {
+    updated.push(`Status: ${statusLabel}`)
+  }
+
+  return updated.join("\n")
+}
+
+export async function updateTicketStatus(
+  ticketId: number,
+  status: number,
+  comment?: string
+) {
+  return withSession(async (sessionToken, url) => {
+    const detailRes = await fetch(
+      `${url}/apirest.php/Ticket/${ticketId}?expand_dropdowns=true`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Session-Token": sessionToken,
+        },
+      }
+    )
+    const current = (await detailRes.json()) as Record<string, unknown>
+
+    if (!detailRes.ok) {
+      throw new Error(
+        Array.isArray(current) ? String(current[1]) : "Ticket introuvable"
+      )
+    }
+
+    const statusLabel = FEUILLE2_STATUS[status] ?? TICKET_STATUS[status] ?? "New"
+    const existingContent = String(current.content ?? "").trim()
+    let nextContent = updateContentStatusLine(existingContent, statusLabel)
+
+    if (comment?.trim()) {
+      const note = comment.trim()
+      nextContent = nextContent
+        ? `${nextContent}\n\n[Changement de statut] ${note}`
+        : `[Changement de statut] ${note}`
+    }
+
+    const input: Record<string, unknown> = {
+      status,
+      content: nextContent,
+    }
+
+    if (comment?.trim() && status === 6) {
+      input.solution = comment.trim()
+      input.solutiontypes_id = 0
+    }
+
+    const response = await fetch(`${url}/apirest.php/Ticket/${ticketId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Session-Token": sessionToken,
+      },
+      body: JSON.stringify({ input }),
+    })
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        Array.isArray(data) ? String(data[1]) : "Mise à jour du statut échouée"
+      )
+    }
+
+    return { ok: true, ticket_id: ticketId, status }
+  })
+}
+
+export { FEUILLE2_STATUS, mapImportTicketStatus, TICKET_STATUS, TICKET_TYPE }

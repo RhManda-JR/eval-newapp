@@ -18,6 +18,7 @@ import {
   createTicketWithItems,
   fetchTicketCostsIndex,
   fetchTicketRefMap,
+  mapImportTicketStatus,
   syncAssetsFromGlpi,
   ticketCostSignature,
   uploadAssetImagesToGlpi,
@@ -94,31 +95,6 @@ function parseItemsList(raw: string): string[] {
 
 function parseDecimal(value: string): number {
   return Number(String(value).replace(",", ".").trim()) || 0
-}
-
-function mapTicketStatus(raw: string): number {
-  const value = raw?.toLowerCase().trim() ?? ""
-  const statuses: Record<string, number> = {
-    new: 1,
-    incoming: 1,
-    nouveau: 1,
-    processing: 2,
-    assigned: 2,
-    "en cours": 2,
-    planned: 3,
-    planifie: 3,
-    planifié: 3,
-    pending: 4,
-    "en attente": 4,
-    solved: 5,
-    resolu: 5,
-    résolu: 5,
-    closed: 6,
-    clos: 6,
-    ferme: 6,
-    fermé: 6,
-  }
-  return statuses[value] ?? 1
 }
 
 const ITEMTYPE_LABELS: Record<string, string> = {
@@ -423,7 +399,7 @@ async function importFeuille2(
       name: row.titre || row.title || `Ticket ${ref}`,
       content,
       type: ticketType,
-      status: mapTicketStatus(row.status || "New"),
+      status: mapImportTicketStatus(row.status || "New"),
       externalid: ref || undefined,
       items: linkedItems,
     })

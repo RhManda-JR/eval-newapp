@@ -15,9 +15,11 @@ import {
   getAsset,
   getAssetStats,
   getDataDir,
+  getKanbanConfig,
   listImports,
   resetLocalData,
   searchAssets,
+  setKanbanConfig,
   setSetting,
 } from "./db.js"
 import { importBundle } from "./import-service.js"
@@ -31,6 +33,7 @@ import {
   getTicketStats,
   resetGlpiData,
   syncAssetsFromGlpi,
+  updateTicketStatus,
 } from "./glpi.js"
 
 const app = express()
@@ -79,6 +82,15 @@ app.put("/api/settings", requireBackoffice, (req, res) => {
 
 app.get("/api/glpi/status", async (_req, res) => {
   res.json(await getGlpiStatus())
+})
+
+app.get("/api/kanban/config", (_req, res) => {
+  res.json(getKanbanConfig())
+})
+
+app.put("/api/kanban/config", requireBackoffice, (req, res) => {
+  setKanbanConfig(req.body ?? {})
+  res.json(getKanbanConfig())
 })
 
 app.post("/api/sync", async (_req, res) => {
@@ -181,6 +193,33 @@ app.get("/api/tickets/:id", async (req, res) => {
   } catch (error) {
     res.status(502).json({
       error: error instanceof Error ? error.message : "Ticket introuvable",
+    })
+  }
+})
+
+app.patch("/api/tickets/:id/status", async (req, res) => {
+  try {
+    const status = Number(req.body?.status)
+    const comment =
+      typeof req.body?.comment === "string" ? req.body.comment : undefined
+
+    if (![1, 2, 6].includes(status)) {
+      res.status(400).json({ error: "Statut Kanban invalide (1, 2 ou 6)" })
+      return
+    }
+
+    const result = await updateTicketStatus(
+      Number(req.params.id),
+      status,
+      comment
+    )
+    res.json(result)
+  } catch (error) {
+    res.status(502).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Mise à jour du statut échouée",
     })
   }
 })

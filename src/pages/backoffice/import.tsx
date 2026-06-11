@@ -2,7 +2,6 @@ import { useState } from "react"
 import { FileArchiveIcon, Loader2Icon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { LoadingOverlay } from "@/components/loading-overlay"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -116,12 +115,7 @@ export function BackofficeImportPage() {
   }
 
   return (
-    <div className="relative flex flex-col gap-6">
-      <LoadingOverlay
-        open={loading}
-        title="Import en cours…"
-        description="Envoi des fichiers vers GLPI et synchronisation NewApp, veuillez patienter."
-      />
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Import</h1>
         <p className="mt-1 text-sm text-muted-foreground">

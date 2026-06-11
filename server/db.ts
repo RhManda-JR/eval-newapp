@@ -68,6 +68,12 @@ const defaults: Record<string, string> = {
   glpi_user: "glpi",
   glpi_password: "glpi",
   backoffice_code: "JUIN26",
+  kanban_color_new: "#dbeafe",
+  kanban_color_in_progress: "#fef08a",
+  kanban_color_closed: "#bbf7d0",
+  kanban_label_new_mg: "vaovao",
+  kanban_label_in_progress_mg: "efa manao",
+  kanban_label_closed_mg: "vita",
 }
 
 const insertSetting = db.prepare(
@@ -97,6 +103,79 @@ export function setSetting(key: string, value: string) {
   db.prepare(
     "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
   ).run(key, value)
+}
+
+for (const [key, value] of Object.entries(defaults)) {
+  if (key.startsWith("kanban_") && !getSetting(key)) {
+    setSetting(key, value)
+  }
+}
+
+export type KanbanConfig = {
+  colors: {
+    new: string
+    in_progress: string
+    closed: string
+  }
+  labels_mg: {
+    new: string
+    in_progress: string
+    closed: string
+  }
+}
+
+const KANBAN_KEYS = {
+  colors: {
+    new: "kanban_color_new",
+    in_progress: "kanban_color_in_progress",
+    closed: "kanban_color_closed",
+  },
+  labels_mg: {
+    new: "kanban_label_new_mg",
+    in_progress: "kanban_label_in_progress_mg",
+    closed: "kanban_label_closed_mg",
+  },
+} as const
+
+export function getKanbanConfig(): KanbanConfig {
+  return {
+    colors: {
+      new: getSetting(KANBAN_KEYS.colors.new) ?? defaults.kanban_color_new,
+      in_progress:
+        getSetting(KANBAN_KEYS.colors.in_progress) ??
+        defaults.kanban_color_in_progress,
+      closed:
+        getSetting(KANBAN_KEYS.colors.closed) ?? defaults.kanban_color_closed,
+    },
+    labels_mg: {
+      new: getSetting(KANBAN_KEYS.labels_mg.new) ?? defaults.kanban_label_new_mg,
+      in_progress:
+        getSetting(KANBAN_KEYS.labels_mg.in_progress) ??
+        defaults.kanban_label_in_progress_mg,
+      closed:
+        getSetting(KANBAN_KEYS.labels_mg.closed) ??
+        defaults.kanban_label_closed_mg,
+    },
+  }
+}
+
+export function setKanbanConfig(config: Partial<KanbanConfig>) {
+  if (config.colors) {
+    for (const [key, settingKey] of Object.entries(KANBAN_KEYS.colors)) {
+      const value = config.colors[key as keyof KanbanConfig["colors"]]
+      if (typeof value === "string" && value.trim()) {
+        setSetting(settingKey, value.trim())
+      }
+    }
+  }
+  if (config.labels_mg) {
+    for (const [key, settingKey] of Object.entries(KANBAN_KEYS.labels_mg)) {
+      const value = config.labels_mg[key as keyof KanbanConfig["labels_mg"]]
+      if (typeof value === "string" && value.trim()) {
+        setSetting(settingKey, value.trim())
+      }
+    }
+  }
 }
 
 export function getAllSettings(): Record<string, string> {

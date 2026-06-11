@@ -8,10 +8,12 @@ import { BackofficeImportPage } from "@/pages/backoffice/import"
 import { BackofficeLoginPage } from "@/pages/backoffice/login"
 import { BackofficeTicketDetailPage } from "@/pages/backoffice/ticket-detail"
 import { BackofficeCostsPage } from "@/pages/backoffice/costs"
+import { BackofficeKanbanSettingsPage } from "@/pages/backoffice/kanban-settings"
 import { BackofficeTicketsPage } from "@/pages/backoffice/tickets"
 import { ResetPage } from "@/pages/reset"
 import { CreateTicketPage } from "@/pages/front/create-ticket"
 import { ElementsPage } from "@/pages/front/elements"
+import { KanbanPage } from "@/pages/front/kanban"
 
 export function App() {
   return (
@@ -19,6 +21,7 @@ export function App() {
       <Routes>
         <Route element={<FrontLayout />}>
           <Route index element={<ElementsPage />} />
+          <Route path="kanban" element={<KanbanPage />} />
           <Route path="ticket/nouveau" element={<CreateTicketPage />} />
         </Route>
 
@@ -31,6 +34,10 @@ export function App() {
             <Route path="backoffice/reset" element={<ResetPage />} />
             <Route path="backoffice/tickets" element={<BackofficeTicketsPage />} />
             <Route path="backoffice/couts" element={<BackofficeCostsPage />} />
+            <Route
+              path="backoffice/kanban"
+              element={<BackofficeKanbanSettingsPage />}
+            />
             <Route
               path="backoffice/tickets/:id"
               element={<BackofficeTicketDetailPage />}

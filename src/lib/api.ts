@@ -66,8 +66,88 @@ export type TicketFeuille2Row = {
   titre: string
   description: string
   status: string
+  status_id: number
   priority: string
   items: string
+  close_comment: string
+}
+
+export type KanbanConfig = {
+  colors: {
+    new: string
+    in_progress: string
+    closed: string
+  }
+  labels_mg: {
+    new: string
+    in_progress: string
+    closed: string
+  }
+}
+
+export const KANBAN_COLUMNS = [
+  {
+    statusId: 1,
+    label: "New",
+    colorKey: "new" as const,
+    labelMgKey: "new" as const,
+  },
+  {
+    statusId: 2,
+    label: "In progress (assigned)",
+    colorKey: "in_progress" as const,
+    labelMgKey: "in_progress" as const,
+  },
+  {
+    statusId: 6,
+    label: "Closed",
+    colorKey: "closed" as const,
+    labelMgKey: "closed" as const,
+  },
+] as const
+
+export function ticketStatusToKanbanId(
+  status: string | number,
+  statusId?: number
+): number {
+  if (typeof statusId === "number" && statusId > 0) {
+    if (statusId === 1) return 1
+    if (statusId === 2 || statusId === 3 || statusId === 4) return 2
+    if (statusId === 5 || statusId === 6) return 6
+  }
+
+  const normalized = String(status).trim().toLowerCase()
+  if (normalized === "1" || normalized === "new" || normalized === "nouveau") {
+    return 1
+  }
+  if (
+    normalized === "2" ||
+    normalized === "in progress (assigned)" ||
+    normalized === "in progress (planned)" ||
+    normalized === "pending" ||
+    normalized === "processing" ||
+    normalized === "planned" ||
+    normalized.startsWith("en cours")
+  ) {
+    return 2
+  }
+  if (
+    normalized === "6" ||
+    normalized === "5" ||
+    normalized === "closed" ||
+    normalized === "clos" ||
+    normalized === "fermé" ||
+    normalized === "solved" ||
+    normalized === "résolu"
+  ) {
+    return 6
+  }
+
+  const numeric = Number(status)
+  if (numeric === 1) return 1
+  if (numeric === 2 || numeric === 3 || numeric === 4) return 2
+  if (numeric === 5 || numeric === 6) return 6
+  return 1
 }
 
 export type Stats = {
@@ -170,6 +250,27 @@ export const api = {
     }),
 
   sync: () => request<{ synced: number }>("/sync", { method: "POST" }),
+
+  kanbanConfig: () => request<KanbanConfig>("/kanban/config"),
+
+  updateKanbanConfig: (config: Partial<KanbanConfig>) =>
+    request<KanbanConfig>("/kanban/config", {
+      method: "PUT",
+      body: JSON.stringify(config),
+      admin: true,
+    }),
+
+  updateTicketStatus: (
+    id: number,
+    data: { status: number; comment?: string }
+  ) =>
+    request<{ ok: boolean; ticket_id: number; status: number }>(
+      `/tickets/${id}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    ),
 
   imageUrl: (filename: string | null) =>
     filename ? `/api/images/${filename.split(/[/\\]/).pop()}` : null,

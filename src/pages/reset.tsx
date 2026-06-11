@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { AlertTriangleIcon, Loader2Icon, RotateCcwIcon } from "lucide-react"
 
-import { LoadingOverlay } from "@/components/loading-overlay"
 import { toast } from "sonner"
 
 import {
@@ -43,13 +42,7 @@ export function ResetPage() {
   }
 
   return (
-    <div className="relative flex flex-col gap-6">
-      <LoadingOverlay
-        open={loading}
-        variant="destructive"
-        title="Réinitialisation en cours…"
-        description="Suppression des données NewApp et GLPI, veuillez patienter."
-      />
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           Réinitialisation
@@ -113,7 +106,13 @@ export function ResetPage() {
                     void handleReset()
                   }}
                 >
-                  Oui, tout réinitialiser
+                  {loading ? (
+                    <Loader2Icon
+                      className="animate-spin"
+                      data-icon="inline-start"
+                    />
+                  ) : null}
+                  {loading ? "Réinitialisation…" : "Oui, tout réinitialiser"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

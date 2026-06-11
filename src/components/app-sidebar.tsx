@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom"
 import {
   CoinsIcon,
+  Columns3Icon,
   ExternalLinkIcon,
   LayoutDashboardIcon,
   RotateCcwIcon,
@@ -42,6 +43,11 @@ const navItems = [
     title: "Coûts",
     url: "/backoffice/couts",
     icon: CoinsIcon,
+  },
+  {
+    title: "Kanban",
+    url: "/backoffice/kanban",
+    icon: Columns3Icon,
   },
   {
     title: "Réinitialisation",
@@ -99,7 +105,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Ouvrir GLPI">
               <a
-                href="http://localhost/glpi/public/"
+                href="http://localhost/glpi/"
                 target="_blank"
                 rel="noreferrer"
               >

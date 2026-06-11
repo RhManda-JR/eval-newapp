@@ -1,4 +1,4 @@
-const DEFAULT_GLPI_URL = "http://127.0.0.1/glpi/public"
+const DEFAULT_GLPI_URL = "http://127.0.0.1/glpi"
 
 function glpiListUrl(baseUrl: string, page: string) {
   return `${baseUrl.replace(/\/$/, "")}/front/${page}?reset=reset`

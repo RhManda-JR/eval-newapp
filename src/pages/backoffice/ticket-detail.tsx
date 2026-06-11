@@ -118,7 +118,7 @@ export function BackofficeTicketDetailPage() {
                     </span>
                     <Button variant="outline" size="sm" asChild>
                       <a
-                        href={`http://localhost/glpi/public/front/${item.itemtype.toLowerCase()}.form.php?id=${item.items_id}`}
+                        href={`http://localhost/glpi/front/${item.itemtype.toLowerCase()}.form.php?id=${item.items_id}`}
                         target="_blank"
                         rel="noreferrer"
                       >

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom"
 import { KeyRoundIcon, Loader2Icon } from "lucide-react"
 import { toast } from "sonner"
 
-import { LoadingOverlay } from "@/components/loading-overlay"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -42,12 +41,7 @@ export function BackofficeLoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center bg-background p-4">
-      <LoadingOverlay
-        open={loading}
-        title="Vérification en cours…"
-        description="Contrôle du code d'accès backoffice."
-      />
+    <div className="flex min-h-svh items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

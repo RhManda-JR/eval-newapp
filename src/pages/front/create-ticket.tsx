@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom"
 import { CheckIcon, Loader2Icon, TicketIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { LoadingOverlay } from "@/components/loading-overlay"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -81,7 +80,7 @@ export function CreateTicketPage() {
         items,
       })
       toast.success(`Ticket #${result.ticket_id} créé dans GLPI`)
-      navigate("/")
+      navigate("/kanban")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Échec")
     } finally {
@@ -92,17 +91,7 @@ export function CreateTicketPage() {
   const busy = assetsLoading || submitting
 
   return (
-    <div className="relative flex flex-col gap-6">
-      <LoadingOverlay
-        open={assetsLoading}
-        title="Chargement du parc…"
-        description="Synchronisation des éléments associables depuis GLPI."
-      />
-      <LoadingOverlay
-        open={submitting}
-        title="Création du ticket…"
-        description="Enregistrement dans GLPI et liaison des éléments sélectionnés."
-      />
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Nouveau ticket</h1>
         <p className="mt-1 text-sm text-muted-foreground">

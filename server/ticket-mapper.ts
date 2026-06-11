@@ -1,5 +1,10 @@
 import { getAllAssetsLookup } from "./db.js"
-import { TICKET_STATUS, TICKET_TYPE } from "./glpi.js"
+import {
+  FEUILLE2_STATUS,
+  normalizeTicketStatusId,
+  TICKET_STATUS,
+  TICKET_TYPE,
+} from "./glpi.js"
 
 export type TicketFeuille2Row = {
   id: number
@@ -10,17 +15,10 @@ export type TicketFeuille2Row = {
   titre: string
   description: string
   status: string
+  status_id: number
   priority: string
   items: string
-}
-
-const FEUILLE2_STATUS: Record<number, string> = {
-  1: "New",
-  2: "Processing",
-  3: "Planned",
-  4: "Pending",
-  5: "Solved",
-  6: "Closed",
+  close_comment: string
 }
 
 function parseTicketContent(content: string) {
@@ -61,6 +59,22 @@ function formatGlpiDate(dateStr: string) {
 
 function formatItemsJson(names: string[]) {
   return JSON.stringify(names)
+}
+
+function extractCloseComment(
+  content: string,
+  solution?: unknown
+): string {
+  const fromContent = [...String(content || "").matchAll(
+    /\[Changement de statut\]\s*(.+)/g
+  )]
+    .map((match) => match[1]?.trim())
+    .filter(Boolean)
+    .at(-1)
+
+  const fromSolution = String(solution ?? "").trim()
+
+  return fromSolution || fromContent || ""
 }
 
 export function mapTicketsToFeuille2(
@@ -108,6 +122,16 @@ export function mapTicketsToFeuille2(
 
     const itemNames = linkedNames.length > 0 ? linkedNames : itemsFromContent
     const glpiDate = String(ticket.date ?? "")
+    const statusId = normalizeTicketStatusId(ticket.status)
+    const status =
+      FEUILLE2_STATUS[statusId] ||
+      TICKET_STATUS[statusId] ||
+      content.status ||
+      "New"
+    const closeComment = extractCloseComment(
+      String(ticket.content ?? ""),
+      ticket.solution
+    )
 
     return {
       id,
@@ -117,13 +141,11 @@ export function mapTicketsToFeuille2(
       type: TICKET_TYPE[Number(ticket.type)] ?? String(ticket.type ?? ""),
       titre: String(ticket.name ?? ""),
       description: content.description,
-      status:
-        content.status ||
-        FEUILLE2_STATUS[Number(ticket.status)] ||
-        TICKET_STATUS[Number(ticket.status)] ||
-        "New",
+      status,
+      status_id: statusId,
       priority: content.priority || "Medium",
       items: formatItemsJson(itemNames),
+      close_comment: status === "Closed" ? closeComment : "",
     } satisfies TicketFeuille2Row
   })
 }
