@@ -156,13 +156,31 @@ export function KanbanPage() {
         </Button>
       </div>
 
+      {updating ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="overflow-hidden rounded-lg border bg-background/95 shadow-sm backdrop-blur"
+        >
+          <div className="h-1 overflow-hidden bg-muted">
+            <div className="h-full animate-pulse bg-primary" />
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+            <Loader2Icon className="size-4 shrink-0 animate-spin text-primary" />
+            Mise à jour du statut en cours…
+          </div>
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground">
           <Loader2Icon className="mr-2 size-5 animate-spin" />
           Chargement…
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div
+          className={`grid gap-4 transition-opacity lg:grid-cols-3 ${updating ? "pointer-events-none opacity-60" : ""}`}
+        >
           {columns.map((column) => (
             <div
               key={column.statusId}
@@ -197,7 +215,7 @@ export function KanbanPage() {
                 {column.tickets.map((ticket) => (
                   <Card
                     key={ticket.id}
-                    draggable
+                    draggable={!updating}
                     className="cursor-grab shadow-sm active:cursor-grabbing"
                     onDragStart={() => setDraggingId(ticket.id)}
                     onDragEnd={() => setDraggingId(null)}
