@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom"
 import {
+  AppWindowIcon,
   CoinsIcon,
   Columns3Icon,
   ExternalLinkIcon,
@@ -61,22 +62,26 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border/60 px-4 py-5">
+      <SidebarHeader className="border-b border-sidebar-border/60 px-4 py-5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-4">
         <div className="flex flex-col gap-0.5 group-data-[collapsible=icon]:items-center">
-          <span className="text-base font-semibold tracking-tight text-sidebar-foreground">
+          <span className="text-base font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
             NewApp
           </span>
+          <AppWindowIcon
+            className="hidden size-5 shrink-0 text-sidebar-foreground group-data-[collapsible=icon]:block"
+            aria-label="NewApp"
+          />
           <span className="text-xs text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
             Extension GLPI
           </span>
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
+      <SidebarContent className="gap-2 group-data-[collapsible=icon]:items-center">
+        <SidebarGroup className="px-3 py-4 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:py-2">
+          <SidebarGroupLabel className="mb-2 px-1">Navigation</SidebarGroupLabel>
+          <SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
+            <SidebarMenu className="gap-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:items-center">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
@@ -100,8 +105,8 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border/60 p-3">
-        <SidebarMenu>
+      <SidebarFooter className="border-t border-sidebar-border/60 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:py-3">
+        <SidebarMenu className="gap-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:items-center">
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Ouvrir GLPI">
               <a

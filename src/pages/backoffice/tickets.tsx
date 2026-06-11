@@ -16,15 +16,15 @@ import { resolveGlpiTicketsListUrl } from "@/lib/glpi-links"
 import { cn } from "@/lib/utils"
 
 const COLUMNS = [
-  { key: "ref_ticket", label: "Ref_Ticket", className: "min-w-[5.5rem]" },
-  { key: "date", label: "Date", className: "min-w-[6.5rem]" },
-  { key: "heure", label: "Heure", className: "min-w-[4.5rem]" },
+  { key: "ref_ticket", label: "Ref_Ticket", className: "min-w-[4.5rem]" },
+  { key: "date", label: "Date", className: "min-w-[5.5rem]" },
+  { key: "heure", label: "Heure", className: "min-w-[4rem]" },
   { key: "type", label: "Type", className: "min-w-[5.5rem]" },
-  { key: "titre", label: "Titre", className: "min-w-[7rem]" },
-  { key: "description", label: "Description", className: "min-w-[8rem]" },
-  { key: "status", label: "Status", className: "min-w-[5rem]" },
+  { key: "titre", label: "Titre", className: "min-w-[9rem]" },
+  { key: "description", label: "Description", className: "min-w-[12rem]" },
+  { key: "status", label: "Status", className: "min-w-[5.5rem]" },
   { key: "priority", label: "Priority", className: "min-w-[5.5rem]" },
-  { key: "items", label: "Items", className: "min-w-[12rem]" },
+  { key: "items", label: "Items", className: "min-w-[8rem]" },
 ] as const
 
 function cellValue(
@@ -45,7 +45,7 @@ export function BackofficeTicketsPage() {
   }, [])
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Tickets</h1>
@@ -63,7 +63,7 @@ export function BackofficeTicketsPage() {
         ) : null}
       </div>
 
-      <Card className="overflow-hidden p-0">
+      <Card className="min-w-0 max-w-full overflow-hidden p-0">
         <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30 px-4 py-3">
           <CardTitle className="text-base">
             {loading ? "…" : tickets.length} ticket(s)
@@ -79,22 +79,22 @@ export function BackofficeTicketsPage() {
               Aucun ticket. Importez les tickets depuis le backoffice.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[80rem] border-collapse text-[13px]">
-                <thead>
-                  <tr className="bg-[#f3f3f3] text-left">
+            <div className="max-h-[min(32rem,calc(100vh-14rem))] max-w-full overflow-auto">
+              <table className="w-full min-w-[58rem] border-collapse text-[13px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-[#f3f3f3] text-left shadow-[0_1px_0_0_var(--border)]">
                     {COLUMNS.map((col) => (
                       <th
                         key={col.key}
                         className={cn(
-                          "border-b border-border px-3 py-2 font-semibold text-foreground",
+                          "border-b border-border bg-[#f3f3f3] px-3 py-2.5 font-semibold text-foreground",
                           col.className
                         )}
                       >
                         {col.label}
                       </th>
                     ))}
-                    <th className="min-w-[5rem] border-b border-border px-3 py-2 font-semibold">
+                    <th className="min-w-[4.5rem] border-b border-border bg-[#f3f3f3] px-3 py-2.5 font-semibold">
                       Fiche
                     </th>
                   </tr>
@@ -104,7 +104,7 @@ export function BackofficeTicketsPage() {
                     <tr
                       key={ticket.id}
                       className={cn(
-                        "border-b border-border/70 hover:bg-primary/5",
+                        "border-b border-border/70 align-top hover:bg-primary/5",
                         index % 2 === 1 && "bg-muted/20"
                       )}
                     >
@@ -113,7 +113,7 @@ export function BackofficeTicketsPage() {
 
                         if (col.key === "status") {
                           return (
-                            <td key={col.key} className="px-3 py-1.5">
+                            <td key={col.key} className="px-3 py-2">
                               <Badge variant="outline" className="font-normal">
                                 {value}
                               </Badge>
@@ -125,7 +125,7 @@ export function BackofficeTicketsPage() {
                           return (
                             <td
                               key={col.key}
-                              className="px-3 py-1.5 font-mono text-xs text-foreground"
+                              className="break-all px-3 py-2 font-mono text-xs leading-relaxed text-foreground"
                             >
                               {value}
                             </td>
@@ -136,20 +136,21 @@ export function BackofficeTicketsPage() {
                           <td
                             key={col.key}
                             className={cn(
-                              "whitespace-nowrap px-3 py-1.5 text-foreground",
-                              col.key === "titre" && "font-medium",
+                              "px-3 py-2 text-foreground",
+                              col.key === "titre" &&
+                                "font-medium leading-snug break-words",
                               col.key === "description" &&
-                                "max-w-[14rem] truncate"
+                                "leading-snug break-words text-muted-foreground",
+                              col.key !== "titre" &&
+                                col.key !== "description" &&
+                                "whitespace-nowrap"
                             )}
-                            title={
-                              col.key === "description" ? value : undefined
-                            }
                           >
                             {value}
                           </td>
                         )
                       })}
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-2">
                         <Button variant="ghost" size="sm" asChild>
                           <Link to={`/backoffice/tickets/${ticket.id}`}>
                             <EyeIcon data-icon="inline-start" />

@@ -13,7 +13,7 @@ export function AppLayout() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-w-0 overflow-x-hidden">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1">
             <PanelLeftIcon />
@@ -35,7 +35,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-6">
           <Outlet />
         </main>
       </SidebarInset>
