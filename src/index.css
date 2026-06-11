@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
@@ -49,7 +48,6 @@
 }
 
 :root {
-    /* GLPI Auror theme */
     --background: #f5f7fb;
     --foreground: #1e293b;
     --card: #ffffff;
@@ -121,11 +119,11 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
 }

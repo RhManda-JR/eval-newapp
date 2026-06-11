@@ -64,7 +64,7 @@ db.exec(`
 `)
 
 const defaults: Record<string, string> = {
-  glpi_url: "http://127.0.0.1/glpi/public",
+  glpi_url: "http://127.0.0.1/glpi",
   glpi_user: "glpi",
   glpi_password: "glpi",
   backoffice_code: "JUIN26",
