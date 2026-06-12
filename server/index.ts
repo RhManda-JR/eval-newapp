@@ -21,6 +21,7 @@ import {
   searchAssets,
   setKanbanConfig,
   setSetting,
+  upsertTicketMirror,
 } from "./db.js"
 import { importBundle } from "./import-service.js"
 import {
@@ -226,12 +227,16 @@ app.patch("/api/tickets/:id/status", async (req, res) => {
 
 app.post("/api/tickets", async (req, res) => {
   try {
-    const { name, content, type, items } = req.body as {
-      name: string
-      content: string
-      type?: number
-      items: { itemtype: string; items_id: number; name?: string }[]
-    }
+    const { name, content, type, urgency, impact, priority, items } =
+      req.body as {
+        name: string
+        content: string
+        type?: number
+        urgency?: string
+        impact?: string
+        priority?: string
+        items: { itemtype: string; items_id: number; name?: string }[]
+      }
 
     if (!name?.trim() || !content?.trim()) {
       res.status(400).json({ error: "Titre et description requis" })
@@ -242,9 +247,30 @@ app.post("/api/tickets", async (req, res) => {
       name,
       content,
       type,
+      urgency,
+      impact,
+      priority,
       items: items ?? [],
     })
-    res.json(result)
+
+    upsertTicketMirror({
+      glpi_id: result.ticket_id,
+      name: name.trim(),
+      content: result.content,
+      type: result.type,
+      status: result.status,
+      urgency: result.urgency,
+      impact: result.impact,
+      priority: result.priority,
+      items_json: JSON.stringify(items ?? []),
+    })
+
+    res.json({
+      ticket_id: result.ticket_id,
+      urgency: result.urgency,
+      impact: result.impact,
+      priority: result.priority,
+    })
   } catch (error) {
     res.status(502).json({
       error: error instanceof Error ? error.message : "Création échouée",

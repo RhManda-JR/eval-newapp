@@ -61,6 +61,20 @@ db.exec(`
     import_log_id INTEGER,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS tickets_mirror (
+    glpi_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    content TEXT,
+    type INTEGER,
+    status INTEGER,
+    urgency TEXT,
+    impact TEXT,
+    priority TEXT,
+    items_json TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    synced_at TEXT DEFAULT (datetime('now'))
+  );
 `)
 
 const defaults: Record<string, string> = {
@@ -87,6 +101,14 @@ for (const [key, value] of Object.entries(defaults)) {
 for (const column of ["status_label TEXT", "user_name TEXT"]) {
   try {
     db.exec(`ALTER TABLE assets_mirror ADD COLUMN ${column}`)
+  } catch {
+    // colonne déjà présente
+  }
+}
+
+for (const column of ["urgency TEXT", "impact TEXT"]) {
+  try {
+    db.exec(`ALTER TABLE tickets_mirror ADD COLUMN ${column}`)
   } catch {
     // colonne déjà présente
   }
@@ -425,12 +447,71 @@ export function collectGlpiTicketIdsFromImports(): number[] {
   return [...ids]
 }
 
+export type TicketMirror = {
+  glpi_id: number
+  name: string
+  content: string | null
+  type: number | null
+  status: number | null
+  urgency: string | null
+  impact: string | null
+  priority: string | null
+  items_json: string | null
+  created_at: string
+  synced_at: string
+}
+
+export function upsertTicketMirror(ticket: {
+  glpi_id: number
+  name: string
+  content?: string
+  type?: number
+  status?: number
+  urgency?: string
+  impact?: string
+  priority?: string
+  items_json?: string
+}) {
+  db.prepare(
+    `INSERT INTO tickets_mirror (glpi_id, name, content, type, status, urgency, impact, priority, items_json, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(glpi_id) DO UPDATE SET
+       name = excluded.name,
+       content = excluded.content,
+       type = excluded.type,
+       status = excluded.status,
+       urgency = excluded.urgency,
+       impact = excluded.impact,
+       priority = excluded.priority,
+       items_json = excluded.items_json,
+       synced_at = datetime('now')`
+  ).run(
+    ticket.glpi_id,
+    ticket.name,
+    ticket.content ?? null,
+    ticket.type ?? null,
+    ticket.status ?? null,
+    ticket.urgency ?? null,
+    ticket.impact ?? null,
+    ticket.priority ?? null,
+    ticket.items_json ?? null
+  )
+}
+
+export function getTicketMirror(glpiId: number): TicketMirror | null {
+  const row = db
+    .prepare("SELECT * FROM tickets_mirror WHERE glpi_id = ?")
+    .get(glpiId) as TicketMirror | undefined
+  return row ?? null
+}
+
 export function resetLocalData() {
   db.exec(`
     DELETE FROM import_logs;
     DELETE FROM assets_mirror;
     DELETE FROM asset_tracking;
     DELETE FROM images_store;
+    DELETE FROM tickets_mirror;
   `)
 }
 

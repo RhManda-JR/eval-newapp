@@ -414,7 +414,9 @@ export function KanbanPage() {
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">{detailTicket.status}</Badge>
                   <Badge variant="secondary">{detailTicket.type}</Badge>
-                  <Badge>{detailTicket.priority}</Badge>
+                  <Badge>Urgence : {detailTicket.urgency}</Badge>
+                  <Badge>Impact : {detailTicket.impact}</Badge>
+                  <Badge>Priorité : {detailTicket.priority}</Badge>
                 </div>
                 <p className="whitespace-pre-wrap leading-relaxed">
                   {detailTicket.description}

@@ -24,7 +24,14 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
-import { api, itemtypeLabel, type Asset } from "@/lib/api"
+import {
+  api,
+  itemtypeLabel,
+  TICKET_IMPACTS,
+  TICKET_PRIORITIES,
+  TICKET_URGENCIES,
+  type Asset,
+} from "@/lib/api"
 
 export function CreateTicketPage() {
   const navigate = useNavigate()
@@ -34,6 +41,9 @@ export function CreateTicketPage() {
   const [name, setName] = useState("")
   const [content, setContent] = useState("")
   const [type, setType] = useState("1")
+  const [urgency, setUrgency] = useState("Moyenne")
+  const [impact, setImpact] = useState("Moyen")
+  const [priority, setPriority] = useState("Moyenne")
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -77,6 +87,9 @@ export function CreateTicketPage() {
         name,
         content,
         type: Number(type),
+        urgency,
+        impact,
+        priority,
         items,
       })
       toast.success(`Ticket #${result.ticket_id} créé dans GLPI`)
@@ -135,6 +148,65 @@ export function CreateTicketPage() {
                   </SelectContent>
                 </Select>
               </Field>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field>
+                  <FieldLabel htmlFor="urgency">Urgence</FieldLabel>
+                  <Select
+                    value={urgency}
+                    onValueChange={setUrgency}
+                    disabled={busy}
+                  >
+                    <SelectTrigger id="urgency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TICKET_URGENCIES.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="impact">Impact</FieldLabel>
+                  <Select
+                    value={impact}
+                    onValueChange={setImpact}
+                    disabled={busy}
+                  >
+                    <SelectTrigger id="impact">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TICKET_IMPACTS.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="priority">Priorité</FieldLabel>
+                  <Select
+                    value={priority}
+                    onValueChange={setPriority}
+                    disabled={busy}
+                  >
+                    <SelectTrigger id="priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TICKET_PRIORITIES.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
               <Field>
                 <FieldLabel htmlFor="content">Description</FieldLabel>
                 <Textarea

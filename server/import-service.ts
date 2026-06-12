@@ -12,6 +12,7 @@ import {
   storeImage,
   trackAsset,
   updateAssetImagePath,
+  upsertTicketMirror,
 } from "./db.js"
 import {
   createTicketCostsInGlpi,
@@ -400,8 +401,21 @@ async function importFeuille2(
       content,
       type: ticketType,
       status: mapImportTicketStatus(row.status || "New"),
+      priority: row.priority || "Moyenne",
       externalid: ref || undefined,
       items: linkedItems,
+    })
+
+    upsertTicketMirror({
+      glpi_id: created.ticket_id,
+      name: row.titre || row.title || `Ticket ${ref}`,
+      content: created.content,
+      type: ticketType,
+      status: created.status,
+      urgency: created.urgency,
+      impact: created.impact,
+      priority: created.priority,
+      items_json: JSON.stringify(linkedItems),
     })
 
     if (ref) {

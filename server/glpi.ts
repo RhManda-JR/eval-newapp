@@ -24,6 +24,117 @@ const TICKET_TYPE: Record<number, string> = {
   2: "Demande",
 }
 
+const GLPI_URGENCY_LABEL: Record<number, string> = {
+  1: "Très basse",
+  2: "Basse",
+  3: "Moyenne",
+  4: "Haute",
+  5: "Très haute",
+}
+
+const GLPI_IMPACT_LABEL: Record<number, string> = {
+  1: "Très bas",
+  2: "Bas",
+  3: "Moyen",
+  4: "Haut",
+  5: "Très haut",
+}
+
+const TICKET_PRIORITY_LABEL: Record<number, string> = {
+  1: "Très basse",
+  2: "Basse",
+  3: "Moyenne",
+  4: "Haute",
+  5: "Très haute",
+  6: "Majeure",
+}
+
+const GLPI_URGENCY_FROM_LABEL: Record<string, number> = {
+  "très basse": 1,
+  "tres basse": 1,
+  "very low": 1,
+  basse: 2,
+  low: 2,
+  moyenne: 3,
+  medium: 3,
+  haute: 4,
+  high: 4,
+  "très haute": 5,
+  "tres haute": 5,
+  "very high": 5,
+}
+
+const GLPI_IMPACT_FROM_LABEL: Record<string, number> = {
+  "très bas": 1,
+  "tres bas": 1,
+  "very low": 1,
+  bas: 2,
+  low: 2,
+  moyen: 3,
+  medium: 3,
+  haut: 4,
+  high: 4,
+  "très haut": 5,
+  "tres haut": 5,
+  "very high": 5,
+}
+
+const TICKET_PRIORITY_FROM_LABEL: Record<string, number> = {
+  ...GLPI_URGENCY_FROM_LABEL,
+  bas: 2,
+  moyen: 3,
+  haut: 4,
+  élevé: 4,
+  eleve: 4,
+  "très haut": 5,
+  "tres haut": 5,
+  majeure: 6,
+  major: 6,
+}
+
+function labelToLevel(
+  label: string,
+  map: Record<string, number>,
+  fallback = 3
+): number {
+  return map[label.trim().toLowerCase()] ?? fallback
+}
+
+export function urgencyLabelToLevel(label: string): number {
+  return labelToLevel(label, GLPI_URGENCY_FROM_LABEL)
+}
+
+export function impactLabelToLevel(label: string): number {
+  return labelToLevel(label, GLPI_IMPACT_FROM_LABEL)
+}
+
+export function priorityLabelToGlpiLevel(label: string): number {
+  return labelToLevel(label, TICKET_PRIORITY_FROM_LABEL)
+}
+
+export function glpiUrgencyToLabel(urgency: unknown): string {
+  const id = Number(urgency)
+  return GLPI_URGENCY_LABEL[id] ?? "Moyenne"
+}
+
+export function glpiImpactToLabel(impact: unknown): string {
+  const id = Number(impact)
+  return GLPI_IMPACT_LABEL[id] ?? "Moyen"
+}
+
+export function glpiPriorityToLabel(priority: unknown): string {
+  const id = Number(priority)
+  return TICKET_PRIORITY_LABEL[id] ?? "Moyenne"
+}
+
+export function priorityLevelToUrgencyLabel(level: number): string {
+  return GLPI_URGENCY_LABEL[Math.min(Math.max(level, 1), 5)] ?? "Moyenne"
+}
+
+export function priorityLevelToImpactLabel(level: number): string {
+  return GLPI_IMPACT_LABEL[Math.min(Math.max(level, 1), 5)] ?? "Moyen"
+}
+
 /** Libellés attendus dans le fichier d'import Feuille-2. */
 const FEUILLE2_STATUS: Record<number, string> = {
   1: "New",
@@ -802,6 +913,9 @@ export async function createTicketWithItems(input: {
   content: string
   type?: number
   status?: number
+  urgency?: string
+  impact?: string
+  priority?: string
   externalid?: string
   items: { itemtype: string; items_id: number; name?: string }[]
 }) {
@@ -817,21 +931,41 @@ export async function createTicketWithItems(input: {
     const itemNames = input.items
       .map((item) => item.name?.trim())
       .filter((name): name is string => Boolean(name))
+    const priorityLabel = input.priority?.trim() || "Moyenne"
+    const priorityLevel = priorityLabelToGlpiLevel(priorityLabel)
+    const urgencyLabel =
+      input.urgency?.trim() || priorityLevelToUrgencyLabel(priorityLevel)
+    const impactLabel =
+      input.impact?.trim() || priorityLevelToImpactLabel(priorityLevel)
+    const urgencyLevel = urgencyLabelToLevel(urgencyLabel)
+    const impactLevel = impactLabelToLevel(impactLabel)
     const body = input.content.trim()
-    const contentLines = [
-      body,
-      `Status: ${FEUILLE2_STATUS[input.status ?? 1] ?? "New"}`,
-      itemNames.length > 0 ? `Éléments: ${itemNames.join(", ")}` : "",
-    ].filter(Boolean)
-    const content = contentLines.join("\n")
+    const contentLines = [body]
+    if (!/(^|\n)(Status|Statut):/m.test(body)) {
+      contentLines.push(`Status: ${FEUILLE2_STATUS[input.status ?? 1] ?? "New"}`)
+    }
+    if (!/(^|\n)(Urgence|Urgency):/m.test(body)) {
+      contentLines.push(`Urgence: ${urgencyLabel}`)
+    }
+    if (!/(^|\n)(Impact):/m.test(body)) {
+      contentLines.push(`Impact: ${impactLabel}`)
+    }
+    if (!/(^|\n)(Priorité|Priority):/m.test(body)) {
+      contentLines.push(`Priorité: ${priorityLabel}`)
+    }
+    if (itemNames.length > 0 && !/(^|\n)(Éléments|Items):/m.test(body)) {
+      contentLines.push(`Éléments: ${itemNames.join(", ")}`)
+    }
+    const content = contentLines.filter(Boolean).join("\n")
 
     const ticketInput: Record<string, unknown> = {
       name: input.name,
       content,
       type: input.type ?? 1,
       status: input.status ?? 1,
-      urgency: 3,
-      impact: 3,
+      urgency: urgencyLevel,
+      impact: impactLevel,
+      priority: priorityLevel,
       entities_id: entityId,
       global_validation: 1,
       _users_id_requester: requesterId,
@@ -889,7 +1023,16 @@ export async function createTicketWithItems(input: {
       }
     }
 
-    return { ticket_id: ticketId, links }
+    return {
+      ticket_id: ticketId,
+      links,
+      urgency: urgencyLabel,
+      impact: impactLabel,
+      priority: priorityLabel,
+      content,
+      type: input.type ?? 1,
+      status: input.status ?? 1,
+    }
   })
 }
 
@@ -1359,4 +1502,4 @@ export async function updateTicketStatus(
   })
 }
 
-export { FEUILLE2_STATUS, mapImportTicketStatus, TICKET_STATUS, TICKET_TYPE }
+export { FEUILLE2_STATUS, mapImportTicketStatus, TICKET_PRIORITY_LABEL, TICKET_STATUS, TICKET_TYPE }

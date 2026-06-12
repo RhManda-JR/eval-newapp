@@ -68,6 +68,8 @@ export type TicketFeuille2Row = {
   status: string
   status_id: number
   priority: string
+  urgency: string
+  impact: string
   items: string
   close_comment: string
 }
@@ -84,6 +86,31 @@ export type KanbanConfig = {
     closed: string
   }
 }
+
+export const TICKET_URGENCIES = [
+  { value: "Très haute", label: "Très haute" },
+  { value: "Haute", label: "Haute" },
+  { value: "Moyenne", label: "Moyenne" },
+  { value: "Basse", label: "Basse" },
+  { value: "Très basse", label: "Très basse" },
+] as const
+
+export const TICKET_IMPACTS = [
+  { value: "Très haut", label: "Très haut" },
+  { value: "Haut", label: "Haut" },
+  { value: "Moyen", label: "Moyen" },
+  { value: "Bas", label: "Bas" },
+  { value: "Très bas", label: "Très bas" },
+] as const
+
+export const TICKET_PRIORITIES = [
+  { value: "Majeure", label: "Majeure" },
+  { value: "Très haute", label: "Très haute" },
+  { value: "Haute", label: "Haute" },
+  { value: "Moyenne", label: "Moyenne" },
+  { value: "Basse", label: "Basse" },
+  { value: "Très basse", label: "Très basse" },
+] as const
 
 export const KANBAN_COLUMNS = [
   {
@@ -214,9 +241,17 @@ export const api = {
     name: string
     content: string
     type?: number
+    urgency?: string
+    impact?: string
+    priority?: string
     items: { itemtype: string; items_id: number; name?: string }[]
   }) =>
-    request<{ ticket_id: number }>("/tickets", {
+    request<{
+      ticket_id: number
+      urgency: string
+      impact: string
+      priority: string
+    }>("/tickets", {
       method: "POST",
       body: JSON.stringify(data),
     }),

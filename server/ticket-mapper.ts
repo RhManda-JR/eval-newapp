@@ -1,6 +1,9 @@
 import { getAllAssetsLookup } from "./db.js"
 import {
   FEUILLE2_STATUS,
+  glpiImpactToLabel,
+  glpiPriorityToLabel,
+  glpiUrgencyToLabel,
   normalizeTicketStatusId,
   TICKET_STATUS,
   TICKET_TYPE,
@@ -17,6 +20,8 @@ export type TicketFeuille2Row = {
   status: string
   status_id: number
   priority: string
+  urgency: string
+  impact: string
   items: string
   close_comment: string
 }
@@ -31,13 +36,19 @@ function parseTicketContent(content: string) {
   let date = ""
   let heure = ""
   let priority = ""
+  let urgency = ""
+  let impact = ""
   let status = ""
   let itemsInline = ""
 
   for (const line of lines.slice(1)) {
     if (line.startsWith("Date:")) date = line.slice(5).trim()
     else if (line.startsWith("Heure:")) heure = line.slice(6).trim()
-    else if (line.startsWith("Priorité:") || line.startsWith("Priority:")) {
+    else if (line.startsWith("Urgence:") || line.startsWith("Urgency:")) {
+      urgency = line.replace(/^(Urgence|Urgency):\s*/, "").trim()
+    } else if (line.startsWith("Impact:")) {
+      impact = line.replace(/^Impact:\s*/, "").trim()
+    } else if (line.startsWith("Priorité:") || line.startsWith("Priority:")) {
       priority = line.replace(/^(Priorité|Priority):\s*/, "").trim()
     } else if (line.startsWith("Status:") || line.startsWith("Statut:")) {
       status = line.replace(/^(Status|Statut):\s*/, "").trim()
@@ -46,7 +57,7 @@ function parseTicketContent(content: string) {
     }
   }
 
-  return { description, date, heure, priority, status, itemsInline }
+  return { description, date, heure, priority, urgency, impact, status, itemsInline }
 }
 
 function formatGlpiDate(dateStr: string) {
@@ -143,7 +154,16 @@ export function mapTicketsToFeuille2(
       description: content.description,
       status,
       status_id: statusId,
-      priority: content.priority || "Medium",
+      priority:
+        content.priority ||
+        glpiPriorityToLabel(ticket.priority) ||
+        "Moyenne",
+      urgency:
+        content.urgency ||
+        glpiUrgencyToLabel(ticket.urgency) ||
+        "Moyenne",
+      impact:
+        content.impact || glpiImpactToLabel(ticket.impact) || "Moyen",
       items: formatItemsJson(itemNames),
       close_comment: status === "Closed" ? closeComment : "",
     } satisfies TicketFeuille2Row
