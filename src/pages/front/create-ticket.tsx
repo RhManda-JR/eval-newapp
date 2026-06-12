@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { CheckIcon, Loader2Icon, TicketIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -26,9 +26,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import {
   api,
+  computeTicketPriorityLabel,
   itemtypeLabel,
   TICKET_IMPACTS,
-  TICKET_PRIORITIES,
   TICKET_URGENCIES,
   type Asset,
 } from "@/lib/api"
@@ -43,8 +43,12 @@ export function CreateTicketPage() {
   const [type, setType] = useState("1")
   const [urgency, setUrgency] = useState("Moyenne")
   const [impact, setImpact] = useState("Moyen")
-  const [priority, setPriority] = useState("Moyenne")
   const [submitting, setSubmitting] = useState(false)
+
+  const computedPriority = useMemo(
+    () => computeTicketPriorityLabel(urgency, impact),
+    [urgency, impact]
+  )
 
   useEffect(() => {
     api
@@ -89,7 +93,6 @@ export function CreateTicketPage() {
         type: Number(type),
         urgency,
         impact,
-        priority,
         items,
       })
       toast.success(`Ticket #${result.ticket_id} créé dans GLPI`)
@@ -148,7 +151,7 @@ export function CreateTicketPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="urgency">Urgence</FieldLabel>
                   <Select
@@ -187,26 +190,13 @@ export function CreateTicketPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="priority">Priorité</FieldLabel>
-                  <Select
-                    value={priority}
-                    onValueChange={setPriority}
-                    disabled={busy}
-                  >
-                    <SelectTrigger id="priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TICKET_PRIORITIES.map((level) => (
-                        <SelectItem key={level.value} value={level.value}>
-                          {level.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Priorité calculée (GLPI) :{" "}
+                <span className="font-medium text-foreground">
+                  {computedPriority}
+                </span>
+              </p>
               <Field>
                 <FieldLabel htmlFor="content">Description</FieldLabel>
                 <Textarea

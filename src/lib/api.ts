@@ -103,14 +103,49 @@ export const TICKET_IMPACTS = [
   { value: "Très bas", label: "Très bas" },
 ] as const
 
-export const TICKET_PRIORITIES = [
-  { value: "Majeure", label: "Majeure" },
-  { value: "Très haute", label: "Très haute" },
-  { value: "Haute", label: "Haute" },
-  { value: "Moyenne", label: "Moyenne" },
-  { value: "Basse", label: "Basse" },
-  { value: "Très basse", label: "Très basse" },
-] as const
+const GLPI_PRIORITY_MATRIX: Record<number, Record<number, number>> = {
+  1: { 1: 1, 2: 1, 3: 2, 4: 2, 5: 2 },
+  2: { 1: 1, 2: 2, 3: 2, 4: 3, 5: 3 },
+  3: { 1: 2, 2: 2, 3: 3, 4: 4, 5: 4 },
+  4: { 1: 2, 2: 3, 3: 4, 4: 4, 5: 5 },
+  5: { 1: 2, 2: 3, 3: 4, 4: 5, 5: 5 },
+}
+
+const URGENCY_LEVELS: Record<string, number> = {
+  "très basse": 1,
+  "tres basse": 1,
+  basse: 2,
+  moyenne: 3,
+  haute: 4,
+  "très haute": 5,
+  "tres haute": 5,
+}
+
+const IMPACT_LEVELS: Record<string, number> = {
+  "très bas": 1,
+  "tres bas": 1,
+  bas: 2,
+  moyen: 3,
+  haut: 4,
+  "très haut": 5,
+  "tres haut": 5,
+}
+
+const PRIORITY_LABELS: Record<number, string> = {
+  1: "Très basse",
+  2: "Basse",
+  3: "Moyenne",
+  4: "Haute",
+  5: "Très haute",
+  6: "Majeure",
+}
+
+export function computeTicketPriorityLabel(urgency: string, impact: string): string {
+  const u = URGENCY_LEVELS[urgency.trim().toLowerCase()] ?? 3
+  const i = IMPACT_LEVELS[impact.trim().toLowerCase()] ?? 3
+  const level = GLPI_PRIORITY_MATRIX[u]?.[i] ?? Math.round((u + i) / 2)
+  return PRIORITY_LABELS[level] ?? "Moyenne"
+}
 
 export const KANBAN_COLUMNS = [
   {
@@ -243,7 +278,6 @@ export const api = {
     type?: number
     urgency?: string
     impact?: string
-    priority?: string
     items: { itemtype: string; items_id: number; name?: string }[]
   }) =>
     request<{

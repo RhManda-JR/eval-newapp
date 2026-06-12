@@ -20,6 +20,9 @@ import {
   fetchTicketCostsIndex,
   fetchTicketRefMap,
   mapImportTicketStatus,
+  priorityLabelToGlpiLevel,
+  priorityLevelToImpactLabel,
+  priorityLevelToUrgencyLabel,
   syncAssetsFromGlpi,
   ticketCostSignature,
   uploadAssetImagesToGlpi,
@@ -396,12 +399,16 @@ async function importFeuille2(
       .filter(Boolean)
       .join("\n")
 
+    const importPriorityLevel = priorityLabelToGlpiLevel(row.priority || "Moyenne")
     const created = await createTicketWithItems({
       name: row.titre || row.title || `Ticket ${ref}`,
       content,
       type: ticketType,
       status: mapImportTicketStatus(row.status || "New"),
-      priority: row.priority || "Moyenne",
+      urgency: priorityLevelToUrgencyLabel(
+        Math.min(importPriorityLevel, 5)
+      ),
+      impact: priorityLevelToImpactLabel(Math.min(importPriorityLevel, 5)),
       externalid: ref || undefined,
       items: linkedItems,
     })

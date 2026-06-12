@@ -227,16 +227,14 @@ app.patch("/api/tickets/:id/status", async (req, res) => {
 
 app.post("/api/tickets", async (req, res) => {
   try {
-    const { name, content, type, urgency, impact, priority, items } =
-      req.body as {
-        name: string
-        content: string
-        type?: number
-        urgency?: string
-        impact?: string
-        priority?: string
-        items: { itemtype: string; items_id: number; name?: string }[]
-      }
+    const { name, content, type, urgency, impact, items } = req.body as {
+      name: string
+      content: string
+      type?: number
+      urgency?: string
+      impact?: string
+      items: { itemtype: string; items_id: number; name?: string }[]
+    }
 
     if (!name?.trim() || !content?.trim()) {
       res.status(400).json({ error: "Titre et description requis" })
@@ -249,7 +247,6 @@ app.post("/api/tickets", async (req, res) => {
       type,
       urgency,
       impact,
-      priority,
       items: items ?? [],
     })
 

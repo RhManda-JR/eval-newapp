@@ -135,6 +135,36 @@ export function priorityLevelToImpactLabel(level: number): string {
   return GLPI_IMPACT_LABEL[Math.min(Math.max(level, 1), 5)] ?? "Moyen"
 }
 
+/** Matrice GLPI par défaut (priority_matrix dans empty_data.php). */
+const GLPI_PRIORITY_MATRIX: Record<number, Record<number, number>> = {
+  1: { 1: 1, 2: 1, 3: 2, 4: 2, 5: 2 },
+  2: { 1: 1, 2: 2, 3: 2, 4: 3, 5: 3 },
+  3: { 1: 2, 2: 2, 3: 3, 4: 4, 5: 4 },
+  4: { 1: 2, 2: 3, 3: 4, 4: 4, 5: 5 },
+  5: { 1: 2, 2: 3, 3: 4, 4: 5, 5: 5 },
+}
+
+export function computePriorityFromUrgencyImpact(
+  urgency: number,
+  impact: number
+): number {
+  const u = Math.min(Math.max(Math.round(urgency), 1), 5)
+  const i = Math.min(Math.max(Math.round(impact), 1), 5)
+  return GLPI_PRIORITY_MATRIX[u]?.[i] ?? Math.round((u + i) / 2)
+}
+
+export function computePriorityLabelFromUrgencyImpact(
+  urgencyLabel: string,
+  impactLabel: string
+): string {
+  return glpiPriorityToLabel(
+    computePriorityFromUrgencyImpact(
+      urgencyLabelToLevel(urgencyLabel),
+      impactLabelToLevel(impactLabel)
+    )
+  )
+}
+
 /** Libellés attendus dans le fichier d'import Feuille-2. */
 const FEUILLE2_STATUS: Record<number, string> = {
   1: "New",
@@ -915,7 +945,6 @@ export async function createTicketWithItems(input: {
   status?: number
   urgency?: string
   impact?: string
-  priority?: string
   externalid?: string
   items: { itemtype: string; items_id: number; name?: string }[]
 }) {
@@ -931,14 +960,15 @@ export async function createTicketWithItems(input: {
     const itemNames = input.items
       .map((item) => item.name?.trim())
       .filter((name): name is string => Boolean(name))
-    const priorityLabel = input.priority?.trim() || "Moyenne"
-    const priorityLevel = priorityLabelToGlpiLevel(priorityLabel)
-    const urgencyLabel =
-      input.urgency?.trim() || priorityLevelToUrgencyLabel(priorityLevel)
-    const impactLabel =
-      input.impact?.trim() || priorityLevelToImpactLabel(priorityLevel)
+    const urgencyLabel = input.urgency?.trim() || "Moyenne"
+    const impactLabel = input.impact?.trim() || "Moyen"
     const urgencyLevel = urgencyLabelToLevel(urgencyLabel)
     const impactLevel = impactLabelToLevel(impactLabel)
+    const priorityLevel = computePriorityFromUrgencyImpact(
+      urgencyLevel,
+      impactLevel
+    )
+    const priorityLabel = glpiPriorityToLabel(priorityLevel)
     const body = input.content.trim()
     const contentLines = [body]
     if (!/(^|\n)(Status|Statut):/m.test(body)) {
@@ -965,7 +995,6 @@ export async function createTicketWithItems(input: {
       status: input.status ?? 1,
       urgency: urgencyLevel,
       impact: impactLevel,
-      priority: priorityLevel,
       entities_id: entityId,
       global_validation: 1,
       _users_id_requester: requesterId,
