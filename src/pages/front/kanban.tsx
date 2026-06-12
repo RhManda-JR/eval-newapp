@@ -48,6 +48,12 @@ const COLUMN_DISPLAY_LABELS: Record<number, string> = {
   6: "Terminé",
 }
 
+const DEFAULT_LABELS_MG = {
+  new: "vaovao",
+  in_progress: "efa manao",
+  closed: "vita",
+} as const
+
 const DEFAULT_COLUMN_COLORS = {
   new: "#dbeafe",
   in_progress: "#ffedd5",
@@ -152,6 +158,7 @@ function KanbanCard({ ticket, isDragging = false, onOpen }: KanbanCardProps) {
 type KanbanColumnProps = {
   statusId: number
   displayLabel: string
+  malagasyLabel: string
   color: string
   tickets: TicketFeuille2Row[]
   activeTicketId: number | null
@@ -162,6 +169,7 @@ type KanbanColumnProps = {
 function KanbanColumn({
   statusId,
   displayLabel,
+  malagasyLabel,
   color,
   tickets,
   activeTicketId,
@@ -182,8 +190,11 @@ function KanbanColumn({
       )}
       style={{ backgroundColor: color }}
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-foreground">{displayLabel}</h2>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">{displayLabel}</h2>
+          <p className="text-sm font-medium text-foreground/75">{malagasyLabel}</p>
+        </div>
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-xs font-medium text-foreground/80 shadow-sm">
           {tickets.length}
         </span>
@@ -250,13 +261,16 @@ export function KanbanPage() {
     return KANBAN_COLUMNS.map((column) => ({
       ...column,
       displayLabel: COLUMN_DISPLAY_LABELS[column.statusId] ?? column.label,
+      malagasyLabel:
+        config?.labels_mg[column.labelMgKey]?.trim() ||
+        DEFAULT_LABELS_MG[column.labelMgKey],
       tickets: tickets.filter(
         (ticket) =>
           ticketStatusToKanbanId(ticket.status, ticket.status_id) ===
           column.statusId
       ),
     }))
-  }, [tickets])
+  }, [tickets, config])
 
   function columnColor(colorKey: keyof KanbanConfig["colors"]) {
     return config?.colors[colorKey] ?? DEFAULT_COLUMN_COLORS[colorKey]
@@ -365,6 +379,7 @@ export function KanbanPage() {
                 key={column.statusId}
                 statusId={column.statusId}
                 displayLabel={column.displayLabel}
+                malagasyLabel={column.malagasyLabel}
                 color={columnColor(column.colorKey)}
                 tickets={column.tickets}
                 activeTicketId={activeTicket?.id ?? null}
