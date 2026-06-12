@@ -11,6 +11,7 @@ import {
 } from "./auth.js"
 import {
   collectGlpiTicketIdsFromImports,
+  deleteTicketCloseSuperCosts,
   getAllSettings,
   getAsset,
   getAssetStats,
@@ -216,6 +217,8 @@ app.patch("/api/tickets/:id/status", async (req, res) => {
     const comment =
       typeof req.body?.comment === "string" ? req.body.comment : undefined
     const superCost = Number(req.body?.super_cost)
+    const cancelLastCost = Boolean(req.body?.cancel_last_cost)
+    const reopenPercent = Number(req.body?.reopen_percent)
     const items = Array.isArray(req.body?.items)
       ? (req.body.items as unknown[])
           .map((item) => String(item).trim())
@@ -228,10 +231,32 @@ app.patch("/api/tickets/:id/status", async (req, res) => {
     }
 
     const ticketId = Number(req.params.id)
+    const closeCostBefore = getTicketSuperCostSummary(ticketId)
     const result = await updateTicketStatus(ticketId, status, comment)
 
     if (status === 6 && Number.isFinite(superCost) && superCost > 0) {
-      saveItemSuperCosts(ticketId, items, superCost)
+      saveItemSuperCosts(ticketId, items, superCost, "close")
+    }
+
+    if (status !== 6) {
+      if (cancelLastCost) {
+        deleteTicketCloseSuperCosts(ticketId)
+      }
+      if (
+        Number.isFinite(reopenPercent) &&
+        reopenPercent > 0 &&
+        closeCostBefore
+      ) {
+        const reopenTotal =
+          Math.round(closeCostBefore.total_cost * reopenPercent) / 100
+        if (reopenTotal > 0) {
+          const reopenItems =
+            items.length > 0
+              ? items
+              : closeCostBefore.shares.map((share) => share.item_name)
+          saveItemSuperCosts(ticketId, reopenItems, reopenTotal, "reopen")
+        }
+      }
     }
 
     res.json(result)

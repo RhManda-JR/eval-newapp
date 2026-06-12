@@ -353,6 +353,8 @@ export const api = {
       status: number
       comment?: string
       super_cost?: number
+      cancel_last_cost?: boolean
+      reopen_percent?: number
       items?: string[]
     }
   ) =>

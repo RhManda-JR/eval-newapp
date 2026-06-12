@@ -83,6 +83,7 @@ db.exec(`
     total_cost REAL NOT NULL,
     item_count INTEGER NOT NULL,
     share_cost REAL NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'close',
     created_at TEXT DEFAULT (datetime('now'))
   );
 `)
@@ -122,6 +123,12 @@ for (const column of ["urgency TEXT", "impact TEXT"]) {
   } catch {
     // colonne déjà présente
   }
+}
+
+try {
+  db.exec(`ALTER TABLE item_super_costs ADD COLUMN kind TEXT NOT NULL DEFAULT 'close'`)
+} catch {
+  // colonne déjà présente
 }
 
 export function getSetting(key: string): string | null {
@@ -532,10 +539,13 @@ export type ItemCostGroup = {
   total_cost: number
 }
 
+export type SuperCostKind = "close" | "reopen"
+
 export function saveItemSuperCosts(
   ticketId: number,
   itemNames: string[],
-  totalCost: number
+  totalCost: number,
+  kind: SuperCostKind = "close"
 ) {
   const cleaned = itemNames.map((name) => name.trim()).filter(Boolean)
   const itemCount = Math.max(cleaned.length, 1)
@@ -543,16 +553,22 @@ export function saveItemSuperCosts(
   const targets = cleaned.length > 0 ? cleaned : ["—"]
 
   const insert = db.prepare(
-    `INSERT INTO item_super_costs (ticket_id, item_name, total_cost, item_count, share_cost)
-     VALUES (?, ?, ?, ?, ?)`
+    `INSERT INTO item_super_costs (ticket_id, item_name, total_cost, item_count, share_cost, kind)
+     VALUES (?, ?, ?, ?, ?, ?)`
   )
 
   const tx = db.transaction(() => {
     for (const itemName of targets) {
-      insert.run(ticketId, itemName, totalCost, itemCount, shareCost)
+      insert.run(ticketId, itemName, totalCost, itemCount, shareCost, kind)
     }
   })
   tx()
+}
+
+export function deleteTicketCloseSuperCosts(ticketId: number) {
+  db.prepare(
+    `DELETE FROM item_super_costs WHERE ticket_id = ? AND kind = 'close'`
+  ).run(ticketId)
 }
 
 export type TicketSuperCostSummary = {
@@ -568,8 +584,8 @@ export function getTicketSuperCostSummary(
     .prepare(
       `SELECT item_name, share_cost, total_cost, item_count
        FROM item_super_costs
-       WHERE ticket_id = ?
-       ORDER BY item_name COLLATE NOCASE`
+       WHERE ticket_id = ? AND kind = 'close'
+       ORDER BY created_at DESC, item_name COLLATE NOCASE`
     )
     .all(ticketId) as Pick<
     ItemSuperCostRow,

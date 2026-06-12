@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -41,6 +42,11 @@ import { cn } from "@/lib/utils"
 type PendingMove = {
   ticket: TicketFeuille2Row
   fromStatus: number
+  toStatus: number
+}
+
+type PendingReopen = {
+  ticket: TicketFeuille2Row
   toStatus: number
 }
 
@@ -238,8 +244,13 @@ export function KanbanPage() {
   const [detailSuperCost, setDetailSuperCost] =
     useState<TicketSuperCostSummary | null>(null)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
+  const [pendingReopen, setPendingReopen] = useState<PendingReopen | null>(null)
   const [statusComment, setStatusComment] = useState("")
   const [superCost, setSuperCost] = useState("")
+  const [cancelLastCost, setCancelLastCost] = useState(false)
+  const [reopenPercent, setReopenPercent] = useState("10")
+  const [reopenLastCost, setReopenLastCost] =
+    useState<TicketSuperCostSummary | null>(null)
 
   const closeItems = useMemo(
     () => (pendingMove ? parseItems(pendingMove.ticket.items) : []),
@@ -292,6 +303,18 @@ export function KanbanPage() {
       .catch(() => setDetailSuperCost(null))
   }, [detailTicket])
 
+  useEffect(() => {
+    if (!pendingReopen) {
+      setReopenLastCost(null)
+      return
+    }
+
+    api
+      .ticketSuperCost(pendingReopen.ticket.id)
+      .then(setReopenLastCost)
+      .catch(() => setReopenLastCost(null))
+  }, [pendingReopen])
+
   const columns = useMemo(() => {
     return KANBAN_COLUMNS.map((column) => ({
       ...column,
@@ -315,10 +338,36 @@ export function KanbanPage() {
     return toStatus === 6 && fromStatus !== 6
   }
 
+  function requiresReopenDialog(fromStatus: number, toStatus: number) {
+    return fromStatus === 6 && (toStatus === 1 || toStatus === 2)
+  }
+
+  const reopenPercentValue = useMemo(() => {
+    const parsed = Number(reopenPercent.replace(",", "."))
+    return Number.isFinite(parsed) ? parsed : 0
+  }, [reopenPercent])
+
+  const reopenCostPreview = useMemo(() => {
+    if (!pendingReopen || reopenPercentValue <= 0 || !reopenLastCost) return null
+    const total =
+      Math.round(reopenLastCost.total_cost * reopenPercentValue) / 100
+    if (total <= 0) return null
+    const items = parseItems(pendingReopen.ticket.items)
+    const count = Math.max(items.length, 1)
+    const share = total / count
+    const targets = items.length > 0 ? items : ["—"]
+    return { total, shares: targets.map((item) => ({ item, share })) }
+  }, [pendingReopen, reopenLastCost, reopenPercentValue])
+
   function applyStatusChangeOptimistic(
     ticket: TicketFeuille2Row,
     toStatus: number,
-    options?: { comment?: string; superCost?: number }
+    options?: {
+      comment?: string
+      superCost?: number
+      cancelLastCost?: boolean
+      reopenPercent?: number
+    }
   ) {
     const previousTickets = tickets
     const nextStatus =
@@ -345,6 +394,8 @@ export function KanbanPage() {
         status: toStatus,
         comment: options?.comment,
         super_cost: options?.superCost,
+        cancel_last_cost: options?.cancelLastCost,
+        reopen_percent: options?.reopenPercent,
         items: parseItems(ticket.items),
       })
       .catch((error) => {
@@ -382,6 +433,13 @@ export function KanbanPage() {
       return
     }
 
+    if (requiresReopenDialog(fromStatus, targetStatus)) {
+      setPendingReopen({ ticket, toStatus: targetStatus })
+      setCancelLastCost(false)
+      setReopenPercent("10")
+      return
+    }
+
     applyStatusChangeOptimistic(ticket, targetStatus)
   }
 
@@ -399,6 +457,21 @@ export function KanbanPage() {
     setPendingMove(null)
     setStatusComment("")
     setSuperCost("")
+  }
+
+  function confirmReopenTicket() {
+    if (!pendingReopen) return
+
+    const hasReopenCost = reopenPercentValue > 0 && reopenLastCost != null
+    const toStatus = hasReopenCost ? 2 : pendingReopen.toStatus
+
+    applyStatusChangeOptimistic(pendingReopen.ticket, toStatus, {
+      cancelLastCost,
+      reopenPercent: hasReopenCost ? reopenPercentValue : undefined,
+    })
+    setPendingReopen(null)
+    setCancelLastCost(false)
+    setReopenPercent("10")
   }
 
   function formatAmount(value: number) {
@@ -593,6 +666,103 @@ export function KanbanPage() {
             >
               Confirmer
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pendingReopen != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingReopen(null)
+            setCancelLastCost(false)
+            setReopenPercent("10")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Réouverture du ticket</DialogTitle>
+            <DialogDescription>
+              {pendingReopen
+                ? `Vers ${
+                    pendingReopen.toStatus === 1 ? "Nouveau" : "En cours"
+                  } — gestion du dernier super coût.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            {reopenLastCost ? (
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm">
+                <p className="mb-1 text-muted-foreground">
+                  Dernier super coût
+                </p>
+                <p className="font-semibold">
+                  {formatAmount(reopenLastCost.total_cost)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Aucun super coût de fermeture enregistré.
+              </p>
+            )}
+            <Field orientation="horizontal">
+              <Checkbox
+                id="cancel-last-cost"
+                checked={cancelLastCost}
+                disabled={!reopenLastCost}
+                onCheckedChange={(checked) =>
+                  setCancelLastCost(checked === true)
+                }
+              />
+              <FieldLabel htmlFor="cancel-last-cost">
+                Annuler le dernier coût
+              </FieldLabel>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="reopen-percent">
+                Pourcentage réouverture (%)
+              </FieldLabel>
+              <Input
+                id="reopen-percent"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={reopenPercent}
+                disabled={!reopenLastCost}
+                onChange={(e) => setReopenPercent(e.target.value)}
+                placeholder="Ex : 10"
+              />
+            </Field>
+            {reopenCostPreview ? (
+              <div className="text-sm text-muted-foreground">
+                <p className="mb-1">
+                  Coût réouverture ({reopenPercentValue}%) — total{" "}
+                  {formatAmount(reopenCostPreview.total)} → statut En cours
+                </p>
+                <ul>
+                  {reopenCostPreview.shares.map((row) => (
+                    <li key={row.item}>
+                      {row.item} : {formatAmount(row.share)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </FieldGroup>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingReopen(null)
+                setCancelLastCost(false)
+                setReopenPercent("10")
+              }}
+            >
+              Annuler
+            </Button>
+            <Button onClick={confirmReopenTicket}>Confirmer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
