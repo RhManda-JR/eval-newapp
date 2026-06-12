@@ -75,6 +75,16 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     synced_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS item_super_costs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    item_name TEXT NOT NULL,
+    total_cost REAL NOT NULL,
+    item_count INTEGER NOT NULL,
+    share_cost REAL NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `)
 
 const defaults: Record<string, string> = {
@@ -505,6 +515,102 @@ export function getTicketMirror(glpiId: number): TicketMirror | null {
   return row ?? null
 }
 
+export type ItemSuperCostRow = {
+  id: number
+  ticket_id: number
+  item_name: string
+  total_cost: number
+  item_count: number
+  share_cost: number
+  created_at: string
+}
+
+export type ItemCostGroup = {
+  item_name: string
+  entry_count: number
+  last_share: number
+  total_cost: number
+}
+
+export function saveItemSuperCosts(
+  ticketId: number,
+  itemNames: string[],
+  totalCost: number
+) {
+  const cleaned = itemNames.map((name) => name.trim()).filter(Boolean)
+  const itemCount = Math.max(cleaned.length, 1)
+  const shareCost = totalCost / itemCount
+  const targets = cleaned.length > 0 ? cleaned : ["—"]
+
+  const insert = db.prepare(
+    `INSERT INTO item_super_costs (ticket_id, item_name, total_cost, item_count, share_cost)
+     VALUES (?, ?, ?, ?, ?)`
+  )
+
+  const tx = db.transaction(() => {
+    for (const itemName of targets) {
+      insert.run(ticketId, itemName, totalCost, itemCount, shareCost)
+    }
+  })
+  tx()
+}
+
+export type TicketSuperCostSummary = {
+  total_cost: number
+  item_count: number
+  shares: { item_name: string; share_cost: number }[]
+}
+
+export function getTicketSuperCostSummary(
+  ticketId: number
+): TicketSuperCostSummary | null {
+  const rows = db
+    .prepare(
+      `SELECT item_name, share_cost, total_cost, item_count
+       FROM item_super_costs
+       WHERE ticket_id = ?
+       ORDER BY item_name COLLATE NOCASE`
+    )
+    .all(ticketId) as Pick<
+    ItemSuperCostRow,
+    "item_name" | "share_cost" | "total_cost" | "item_count"
+  >[]
+
+  if (rows.length === 0) return null
+
+  return {
+    total_cost: rows[0].total_cost,
+    item_count: rows[0].item_count,
+    shares: rows.map((row) => ({
+      item_name: row.item_name,
+      share_cost: row.share_cost,
+    })),
+  }
+}
+
+export function listItemCostsGrouped(): ItemCostGroup[] {
+  return db
+    .prepare(
+      `SELECT
+         g.item_name,
+         g.entry_count,
+         g.total_cost,
+         s.share_cost AS last_share
+       FROM (
+         SELECT
+           item_name,
+           COUNT(*) AS entry_count,
+           ROUND(SUM(share_cost), 2) AS total_cost,
+           MAX(id) AS last_id
+         FROM item_super_costs
+         GROUP BY item_name
+       ) g
+       JOIN item_super_costs s ON s.id = g.last_id
+       ORDER BY g.item_name COLLATE NOCASE`
+    )
+    .all() as ItemCostGroup[]
+}
+
 export function resetLocalData() {
   db.exec(`
     DELETE FROM import_logs;
@@ -512,6 +618,7 @@ export function resetLocalData() {
     DELETE FROM asset_tracking;
     DELETE FROM images_store;
     DELETE FROM tickets_mirror;
+    DELETE FROM item_super_costs;
   `)
 }
 

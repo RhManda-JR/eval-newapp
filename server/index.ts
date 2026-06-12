@@ -16,8 +16,11 @@ import {
   getAssetStats,
   getDataDir,
   getKanbanConfig,
+  getTicketSuperCostSummary,
+  listItemCostsGrouped,
   listImports,
   resetLocalData,
+  saveItemSuperCosts,
   searchAssets,
   setKanbanConfig,
   setSetting,
@@ -198,22 +201,39 @@ app.get("/api/tickets/:id", async (req, res) => {
   }
 })
 
+app.get("/api/tickets/:id/super-cost", (req, res) => {
+  const summary = getTicketSuperCostSummary(Number(req.params.id))
+  res.json(summary)
+})
+
+app.get("/api/item-costs", (_req, res) => {
+  res.json(listItemCostsGrouped())
+})
+
 app.patch("/api/tickets/:id/status", async (req, res) => {
   try {
     const status = Number(req.body?.status)
     const comment =
       typeof req.body?.comment === "string" ? req.body.comment : undefined
+    const superCost = Number(req.body?.super_cost)
+    const items = Array.isArray(req.body?.items)
+      ? (req.body.items as unknown[])
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+      : []
 
     if (![1, 2, 6].includes(status)) {
       res.status(400).json({ error: "Statut Kanban invalide (1, 2 ou 6)" })
       return
     }
 
-    const result = await updateTicketStatus(
-      Number(req.params.id),
-      status,
-      comment
-    )
+    const ticketId = Number(req.params.id)
+    const result = await updateTicketStatus(ticketId, status, comment)
+
+    if (status === 6 && Number.isFinite(superCost) && superCost > 0) {
+      saveItemSuperCosts(ticketId, items, superCost)
+    }
+
     res.json(result)
   } catch (error) {
     res.status(502).json({

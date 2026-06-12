@@ -13,6 +13,7 @@ import { BackofficeTicketsPage } from "@/pages/backoffice/tickets"
 import { ResetPage } from "@/pages/reset"
 import { CreateTicketPage } from "@/pages/front/create-ticket"
 import { ElementsPage } from "@/pages/front/elements"
+import { ItemCostsPage } from "@/pages/front/costs"
 import { KanbanPage } from "@/pages/front/kanban"
 
 export function App() {
@@ -22,6 +23,7 @@ export function App() {
         <Route element={<FrontLayout />}>
           <Route index element={<ElementsPage />} />
           <Route path="kanban" element={<KanbanPage />} />
+          <Route path="couts" element={<ItemCostsPage />} />
           <Route path="ticket/nouveau" element={<CreateTicketPage />} />
         </Route>
 

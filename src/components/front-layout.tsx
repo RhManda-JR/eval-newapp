@@ -1,5 +1,6 @@
 import { Link, Outlet } from "react-router-dom"
 import {
+  CoinsIcon,
   Columns3Icon,
   HeadsetIcon,
   LayoutGridIcon,
@@ -28,6 +29,12 @@ export function FrontLayout() {
               <Link to="/kanban">
                 <Columns3Icon data-icon="inline-start" />
                 Kanban
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/couts">
+                <CoinsIcon data-icon="inline-start" />
+                Coûts
               </Link>
             </Button>
           </nav>

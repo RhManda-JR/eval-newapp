@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   api,
@@ -33,6 +34,7 @@ import {
   ticketStatusToKanbanId,
   type KanbanConfig,
   type TicketFeuille2Row,
+  type TicketSuperCostSummary,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -233,8 +235,29 @@ export function KanbanPage() {
   const [loading, setLoading] = useState(true)
   const [activeTicket, setActiveTicket] = useState<TicketFeuille2Row | null>(null)
   const [detailTicket, setDetailTicket] = useState<TicketFeuille2Row | null>(null)
+  const [detailSuperCost, setDetailSuperCost] =
+    useState<TicketSuperCostSummary | null>(null)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [statusComment, setStatusComment] = useState("")
+  const [superCost, setSuperCost] = useState("")
+
+  const closeItems = useMemo(
+    () => (pendingMove ? parseItems(pendingMove.ticket.items) : []),
+    [pendingMove]
+  )
+
+  const superCostValue = useMemo(() => {
+    const parsed = Number(superCost.replace(",", "."))
+    return Number.isFinite(parsed) ? parsed : 0
+  }, [superCost])
+
+  const costSplitPreview = useMemo(() => {
+    if (superCostValue <= 0) return []
+    const count = Math.max(closeItems.length, 1)
+    const share = superCostValue / count
+    const targets = closeItems.length > 0 ? closeItems : ["—"]
+    return targets.map((item) => ({ item, share }))
+  }, [closeItems, superCostValue])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -256,6 +279,18 @@ export function KanbanPage() {
       .catch(() => toast.error("Impossible de charger le tableau Kanban"))
       .finally(() => setLoading(false))
   }, [loadBoard])
+
+  useEffect(() => {
+    if (!detailTicket) {
+      setDetailSuperCost(null)
+      return
+    }
+
+    api
+      .ticketSuperCost(detailTicket.id)
+      .then(setDetailSuperCost)
+      .catch(() => setDetailSuperCost(null))
+  }, [detailTicket])
 
   const columns = useMemo(() => {
     return KANBAN_COLUMNS.map((column) => ({
@@ -283,7 +318,7 @@ export function KanbanPage() {
   function applyStatusChangeOptimistic(
     ticket: TicketFeuille2Row,
     toStatus: number,
-    comment?: string
+    options?: { comment?: string; superCost?: number }
   ) {
     const previousTickets = tickets
     const nextStatus =
@@ -297,14 +332,21 @@ export function KanbanPage() {
               status: nextStatus,
               status_id: toStatus,
               close_comment:
-                toStatus === 6 ? (comment?.trim() ?? row.close_comment) : "",
+                toStatus === 6
+                  ? (options?.comment?.trim() ?? row.close_comment)
+                  : "",
             }
           : row
       )
     )
 
     void api
-      .updateTicketStatus(ticket.id, { status: toStatus, comment })
+      .updateTicketStatus(ticket.id, {
+        status: toStatus,
+        comment: options?.comment,
+        super_cost: options?.superCost,
+        items: parseItems(ticket.items),
+      })
       .catch((error) => {
         setTickets(previousTickets)
         toast.error(
@@ -350,13 +392,20 @@ export function KanbanPage() {
   function confirmCloseTicket() {
     if (!pendingMove || !statusComment.trim()) return
 
-    applyStatusChangeOptimistic(
-      pendingMove.ticket,
-      pendingMove.toStatus,
-      statusComment.trim()
-    )
+    applyStatusChangeOptimistic(pendingMove.ticket, pendingMove.toStatus, {
+      comment: statusComment.trim(),
+      superCost: superCostValue > 0 ? superCostValue : undefined,
+    })
     setPendingMove(null)
     setStatusComment("")
+    setSuperCost("")
+  }
+
+  function formatAmount(value: number) {
+    return value.toLocaleString("fr-FR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })
   }
 
   return (
@@ -432,6 +481,25 @@ export function KanbanPage() {
                     </p>
                   </div>
                 ) : null}
+                {detailSuperCost ? (
+                  <div className="rounded-lg border bg-muted/50 p-3">
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">
+                      Super coût / vidiny vaovao
+                    </p>
+                    <p className="font-semibold">
+                      {formatAmount(detailSuperCost.total_cost)}
+                    </p>
+                    {detailSuperCost.shares.length > 1 ? (
+                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        {detailSuperCost.shares.map((share) => (
+                          <li key={share.item_name}>
+                            {share.item_name} — {formatAmount(share.share_cost)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
                 <p className="text-muted-foreground">
                   {detailTicket.date} · {detailTicket.heure}
                 </p>
@@ -456,14 +524,16 @@ export function KanbanPage() {
           if (!open) {
             setPendingMove(null)
             setStatusComment("")
+            setSuperCost("")
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Informations complémentaires</DialogTitle>
+            <DialogTitle>Fermeture du ticket</DialogTitle>
             <DialogDescription>
-              La fermeture du ticket nécessite un commentaire de résolution.
+              Commentaire de résolution et super coût (vidiny vaovao) enregistré
+              dans SQLite, réparti entre les éléments liés.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -477,6 +547,34 @@ export function KanbanPage() {
                 rows={4}
               />
             </Field>
+            <Field>
+              <FieldLabel htmlFor="super-cost">
+                Super coût / vidiny vaovao
+              </FieldLabel>
+              <Input
+                id="super-cost"
+                type="number"
+                min="0"
+                step="0.01"
+                value={superCost}
+                onChange={(e) => setSuperCost(e.target.value)}
+                placeholder="Ex : 150000"
+              />
+            </Field>
+            {costSplitPreview.length > 0 ? (
+              <div className="text-sm text-muted-foreground">
+                <p className="mb-1">
+                  Répartition — total {formatAmount(superCostValue)}
+                </p>
+                <ul>
+                  {costSplitPreview.map((row) => (
+                    <li key={row.item}>
+                      {row.item} : {formatAmount(row.share)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </FieldGroup>
           <DialogFooter>
             <Button
@@ -484,6 +582,7 @@ export function KanbanPage() {
               onClick={() => {
                 setPendingMove(null)
                 setStatusComment("")
+                setSuperCost("")
               }}
             >
               Annuler
