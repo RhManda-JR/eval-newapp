@@ -9,7 +9,9 @@ import {
   requireBackoffice,
   verifyBackofficeCode,
 } from "./auth.js"
-import { listItemCostsReport } from "./cost-report.js"
+import { listItemCostDetails, listItemCostsReport } from "./cost-report.js"
+import { resolveCostItemNames } from "./cost-items.js"
+import { importCostMovementsFromCsv } from "./cost-import.js"
 import {
   collectGlpiTicketIdsFromImports,
   deleteLastTicketCloseSuperCosts,
@@ -18,7 +20,6 @@ import {
   getAssetStats,
   getDataDir,
   getKanbanConfig,
-  getTicketMirror,
   getTicketSuperCostSummary,
   listImports,
   resetLocalData,
@@ -34,7 +35,6 @@ import {
   computeGlpiCostsByItemType,
   computeGlpiInterventionsByItemType,
   fetchTicketById,
-  fetchTicketLinkedItemLabels,
   fetchTickets,
   fetchTicketsFeuille2,
   fetchTicketCostsFeuille3,
@@ -44,7 +44,6 @@ import {
   syncAssetsFromGlpi,
   updateTicketStatus,
 } from "./glpi.js"
-import { parseTicketItemsFromContent } from "./ticket-mapper.js"
 
 const app = express()
 const upload = multer({
@@ -224,36 +223,35 @@ app.get("/api/item-costs", async (_req, res) => {
   }
 })
 
-async function resolveCostItemNames(
-  ticketId: number,
-  bodyItems: string[]
-): Promise<string[]> {
-  if (bodyItems.length > 0) return bodyItems
-
-  const mirror = getTicketMirror(ticketId)
-  if (mirror?.items_json) {
-    try {
-      const parsed = JSON.parse(mirror.items_json) as string[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    } catch {
-      // ignore invalid JSON
-    }
-  }
-
-  if (mirror?.content) {
-    const fromContent = parseTicketItemsFromContent(mirror.content)
-    if (fromContent.length > 0) return fromContent
-  }
-
+app.get("/api/item-costs/:item/details", async (req, res) => {
   try {
-    const fromGlpi = await fetchTicketLinkedItemLabels(ticketId)
-    if (fromGlpi.length > 0) return fromGlpi
-  } catch {
-    // GLPI indisponible — enregistrement sous « — »
+    const item = decodeURIComponent(req.params.item)
+    const glpiByType = await computeGlpiCostsByItemType()
+    res.json(listItemCostDetails(item, glpiByType))
+  } catch (error) {
+    res.status(502).json({
+      error:
+        error instanceof Error ? error.message : "Détail des coûts indisponible",
+    })
   }
+})
 
-  return []
-}
+app.post("/api/costs/import", upload.single("csv"), async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      res.status(400).json({ error: "Fichier CSV requis (champ csv)" })
+      return
+    }
+    const result = await importCostMovementsFromCsv(
+      req.file.buffer.toString("utf-8")
+    )
+    res.json(result)
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Import coûts échoué",
+    })
+  }
+})
 
 app.patch("/api/tickets/:id/status", async (req, res) => {
   try {

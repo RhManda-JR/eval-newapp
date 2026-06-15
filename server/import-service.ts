@@ -28,6 +28,8 @@ import {
   uploadAssetImagesToGlpi,
   upsertAssetsFromCsvRows,
 } from "./glpi.js"
+import { applyCostMovementRows } from "./cost-import.js"
+import { isMovementCostCsv } from "./cost-items.js"
 
 type UploadedFile = { originalname: string; buffer: Buffer }
 
@@ -448,7 +450,7 @@ async function importFeuille2(
   }
 }
 
-async function importFeuille3(
+async function importFeuille3Glpi(
   buffer: Buffer,
   ticketRefMap: Record<string, number>
 ) {
@@ -502,12 +504,32 @@ async function importFeuille3(
   const results = await createTicketCostsInGlpi(costs)
 
   return {
-    label: "Coûts",
+    label: "Coûts GLPI",
+    format: "glpi-ticketcost",
     records: rows.length,
     created: results.filter((r) => r.ok).length,
     skipped: totalSkipped,
     details,
   }
+}
+
+async function importFeuille3(
+  buffer: Buffer,
+  ticketRefMap: Record<string, number>
+) {
+  const rows = parseCsv(buffer.toString("utf-8"))
+  if (isMovementCostCsv(rows)) {
+    const result = await applyCostMovementRows(rows, ticketRefMap)
+    return {
+      label: "Coûts (mouvements)",
+      format: "ticket-mvt-valeur",
+      records: result.records,
+      created: result.applied,
+      failed: result.failed,
+      details: result.details,
+    }
+  }
+  return importFeuille3Glpi(buffer, ticketRefMap)
 }
 
 export async function importBundle(files: {

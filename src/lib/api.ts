@@ -70,6 +70,39 @@ export type ItemCostReportRow = {
 /** @deprecated use ItemCostReportRow */
 export type ItemCostGroup = ItemCostReportRow
 
+export type ItemCostMovementRow = {
+  ticket_id: number
+  mvt: string
+  valeur: number
+  share_cost: number
+  created_at: string
+}
+
+export type ItemCostDetailReport = {
+  item: string
+  movements: ItemCostMovementRow[]
+  totals: {
+    glpi: number
+    super_cost: number
+    reopen: number
+    total: number
+  }
+}
+
+export type CostImportResult = {
+  records: number
+  applied: number
+  failed: number
+  details: {
+    ref: string
+    ticket_id?: number
+    mvt?: string
+    valeur?: number
+    applied?: boolean
+    error?: string
+  }[]
+}
+
 export type TicketSuperCostSummary = {
   total_cost: number
   item_count: number
@@ -349,6 +382,20 @@ export const api = {
     }),
 
   itemCosts: () => request<ItemCostReportRow[]>("/item-costs"),
+
+  itemCostDetails: (item: string) =>
+    request<ItemCostDetailReport>(
+      `/item-costs/${encodeURIComponent(item)}/details`
+    ),
+
+  importCostCsv: (file: File) => {
+    const form = new FormData()
+    form.append("csv", file)
+    return request<CostImportResult>("/costs/import", {
+      method: "POST",
+      body: form,
+    })
+  },
 
   ticketSuperCost: (id: number) =>
     request<TicketSuperCostSummary | null>(`/tickets/${id}/super-cost`),

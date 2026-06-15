@@ -1,7 +1,11 @@
 import { db, getAllAssetsLookup } from "./db.js"
 import {
+  displayItemTypeLabel,
+  displayMovementLabel,
   normalizeItemTypeKey,
+  resolveItemTypeInput,
   STANDARD_ITEM_TYPES,
+  UNASSIGNED_ITEM_TYPE,
 } from "./item-types.js"
 
 export type ItemCostReportRow = {
@@ -12,6 +16,25 @@ export type ItemCostReportRow = {
   total_super_cost: number
   total_reopen: number
   total: number
+}
+
+export type ItemCostMovementRow = {
+  ticket_id: number
+  mvt: string
+  valeur: number
+  share_cost: number
+  created_at: string
+}
+
+export type ItemCostDetailReport = {
+  item: string
+  movements: ItemCostMovementRow[]
+  totals: {
+    glpi: number
+    super_cost: number
+    reopen: number
+    total: number
+  }
 }
 
 function buildAssetTypeMap() {
@@ -93,14 +116,18 @@ export function listItemCostsReport(
 
   const labels = new Set<string>([
     ...STANDARD_ITEM_TYPES,
+    UNASSIGNED_ITEM_TYPE,
     ...buckets.keys(),
     ...Object.keys(normalizedGlpi),
     ...Object.keys(normalizedGlpiInterventions),
   ])
 
   return [...labels]
-    .filter((item) => item !== "Unassigned")
-    .sort((a, b) => a.localeCompare(b, "en"))
+    .sort((a, b) => {
+      if (a === UNASSIGNED_ITEM_TYPE) return 1
+      if (b === UNASSIGNED_ITEM_TYPE) return -1
+      return a.localeCompare(b, "en")
+    })
     .map((item) => {
       const totalGlpi = Math.round((normalizedGlpi[item] ?? 0) * 100) / 100
       const totalSuper =
@@ -113,7 +140,7 @@ export function listItemCostsReport(
         (normalizedGlpiInterventions[item] ?? 0)
 
       return {
-        item,
+        item: displayItemTypeLabel(item),
         quantity: assetCounts.get(item) ?? 0,
         interventions,
         total_glpi: totalGlpi,
@@ -130,4 +157,70 @@ export function listItemCostsReport(
         row.quantity > 0 ||
         row.interventions > 0
     )
+}
+
+export function listItemCostDetails(
+  itemType: string,
+  glpiByType: Record<string, number> = {}
+): ItemCostDetailReport {
+  const assetMap = buildAssetTypeMap()
+  const key = normalizeItemTypeKey(resolveItemTypeInput(itemType), assetMap)
+
+  const rows = db
+    .prepare(
+      `SELECT ticket_id, item_name, total_cost, share_cost, kind, created_at
+       FROM item_super_costs
+       ORDER BY created_at ASC, ticket_id ASC, id ASC`
+    )
+    .all() as {
+    ticket_id: number
+    item_name: string
+    total_cost: number
+    share_cost: number
+    kind: string
+    created_at: string
+  }[]
+
+  const movements: ItemCostMovementRow[] = []
+  const seen = new Set<string>()
+
+  for (const row of rows) {
+    if (normalizeItemTypeKey(row.item_name, assetMap) !== key) continue
+
+    const batchKey = `${row.ticket_id}:${row.kind}:${row.created_at}`
+    if (seen.has(batchKey)) continue
+    seen.add(batchKey)
+
+    movements.push({
+      ticket_id: row.ticket_id,
+      mvt: displayMovementLabel(row.kind),
+      valeur: row.total_cost,
+      share_cost: row.share_cost,
+      created_at: row.created_at,
+    })
+  }
+
+  const totalGlpi =
+    Math.round((glpiByType[key] ?? glpiByType[itemType] ?? 0) * 100) / 100
+
+  let totalSuper = 0
+  let totalReopen = 0
+  for (const row of rows) {
+    if (normalizeItemTypeKey(row.item_name, assetMap) !== key) continue
+    if (row.kind === "close") totalSuper += Number(row.share_cost) || 0
+    if (row.kind === "reopen") totalReopen += Number(row.share_cost) || 0
+  }
+  totalSuper = Math.round(totalSuper * 100) / 100
+  totalReopen = Math.round(totalReopen * 100) / 100
+
+  return {
+    item: displayItemTypeLabel(key),
+    movements,
+    totals: {
+      glpi: totalGlpi,
+      super_cost: totalSuper,
+      reopen: totalReopen,
+      total: Math.round((totalGlpi + totalSuper + totalReopen) * 100) / 100,
+    },
+  }
 }

@@ -21,7 +21,11 @@ import {
 const CSV_SLOTS = [
   { key: "feuille1" as const, label: "Parc (CSV)" },
   { key: "feuille2" as const, label: "Tickets (CSV)" },
-  { key: "feuille3" as const, label: "Coûts (CSV)" },
+  {
+    key: "feuille3" as const,
+    label: "Coûts (CSV)",
+    hint: "ticket · mvt (open/reouverture/cancel/closed) · valeur",
+  },
 ]
 
 export function BackofficeImportPage() {
@@ -154,6 +158,9 @@ export function BackofficeImportPage() {
                     ✓ {files[slot.key]?.name}
                   </p>
                 )}
+                {"hint" in slot && slot.hint ? (
+                  <p className="text-xs text-muted-foreground">{slot.hint}</p>
+                ) : null}
               </Field>
             ))}
 

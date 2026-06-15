@@ -14,6 +14,7 @@ import { ResetPage } from "@/pages/reset"
 import { CreateTicketPage } from "@/pages/front/create-ticket"
 import { ElementsPage } from "@/pages/front/elements"
 import { ItemCostsPage } from "@/pages/front/costs"
+import { ImportCostsPage } from "@/pages/front/import-costs"
 import { KanbanPage } from "@/pages/front/kanban"
 
 export function App() {
@@ -23,6 +24,7 @@ export function App() {
         <Route element={<FrontLayout />}>
           <Route index element={<ElementsPage />} />
           <Route path="kanban" element={<KanbanPage />} />
+          <Route path="import" element={<ImportCostsPage />} />
           <Route path="couts" element={<ItemCostsPage />} />
           <Route path="ticket/nouveau" element={<CreateTicketPage />} />
         </Route>

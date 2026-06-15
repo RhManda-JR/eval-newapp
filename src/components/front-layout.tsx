@@ -4,6 +4,7 @@ import {
   Columns3Icon,
   HeadsetIcon,
   LayoutGridIcon,
+  UploadIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,12 @@ export function FrontLayout() {
               <Link to="/kanban">
                 <Columns3Icon data-icon="inline-start" />
                 Kanban
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/import">
+                <UploadIcon data-icon="inline-start" />
+                Import
               </Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
