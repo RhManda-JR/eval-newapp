@@ -59,9 +59,12 @@ export type TicketCostFeuille3Row = {
 
 export type ItemCostReportRow = {
   item: string
+  quantity: number
+  interventions: number
   total_glpi: number
   total_super_cost: number
   total_reopen: number
+  total: number
 }
 
 /** @deprecated use ItemCostReportRow */

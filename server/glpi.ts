@@ -752,15 +752,9 @@ export async function fetchTicketCostsFeuille3(limit = 200) {
   })
 }
 
-export async function computeGlpiCostsByItemType(): Promise<
+export async function computeGlpiInterventionsByItemType(): Promise<
   Record<string, number>
 > {
-  const ITEMTYPE_LABELS: Record<string, string> = {
-    Computer: "Ordinateur",
-    Monitor: "Moniteur",
-    Printer: "Imprimante",
-  }
-
   return withSession(async (sessionToken, url) => {
     const costs = await listAllItems<Record<string, unknown>>(
       sessionToken,
@@ -772,37 +766,76 @@ export async function computeGlpiCostsByItemType(): Promise<
       itemtype: string
     }>(sessionToken, url, "Item_Ticket", false)
 
-    const labelsByTicket = new Map<number, string[]>()
+    const typesByTicket = new Map<number, string[]>()
     for (const link of links) {
       const ticketId = Number(link.tickets_id)
       if (!ticketId) continue
-      const label =
-        ITEMTYPE_LABELS[String(link.itemtype)] ?? String(link.itemtype)
-      const list = labelsByTicket.get(ticketId) ?? []
-      list.push(label)
-      labelsByTicket.set(ticketId, list)
+      const itemtype = String(link.itemtype)
+      const list = typesByTicket.get(ticketId) ?? []
+      list.push(itemtype)
+      typesByTicket.set(ticketId, list)
+    }
+
+    const counts: Record<string, number> = {}
+
+    for (const cost of costs) {
+      const ticketId = Number(cost.tickets_id)
+      const types = typesByTicket.get(ticketId)
+      if (!types?.length) continue
+
+      for (const itemtype of types) {
+        counts[itemtype] = (counts[itemtype] ?? 0) + 1
+      }
+    }
+
+    return counts
+  })
+}
+
+export async function computeGlpiCostsByItemType(): Promise<
+  Record<string, number>
+> {
+  return withSession(async (sessionToken, url) => {
+    const costs = await listAllItems<Record<string, unknown>>(
+      sessionToken,
+      url,
+      "TicketCost"
+    )
+    const links = await listAllItems<{
+      tickets_id: number
+      itemtype: string
+    }>(sessionToken, url, "Item_Ticket", false)
+
+    const typesByTicket = new Map<number, string[]>()
+    for (const link of links) {
+      const ticketId = Number(link.tickets_id)
+      if (!ticketId) continue
+      const itemtype = String(link.itemtype)
+      const list = typesByTicket.get(ticketId) ?? []
+      list.push(itemtype)
+      typesByTicket.set(ticketId, list)
     }
 
     const totals: Record<string, number> = {}
 
     for (const cost of costs) {
       const ticketId = Number(cost.tickets_id)
-      const labels = labelsByTicket.get(ticketId)
-      if (!labels?.length) continue
+      const types = typesByTicket.get(ticketId)
+      if (!types?.length) continue
 
       const costTime = Number(String(cost.cost_time ?? "0").replace(",", "."))
       const fixed = Number(cost.cost_fixed) || 0
       const amount = costTime + fixed
       if (amount <= 0) continue
 
-      const share = amount / labels.length
-      for (const label of labels) {
-        totals[label] = (totals[label] ?? 0) + share
+      const share = amount / types.length
+      for (const itemtype of types) {
+        totals[itemtype] = (totals[itemtype] ?? 0) + share
       }
     }
 
-    for (const label of Object.keys(totals)) {
-      totals[label] = Math.round(totals[label] * 100) / 100
+    for (const itemtype of Object.keys(totals)) {
+      totals[itemtype] = Math.round(totals[itemtype] * 100) / 100
     }
 
     return totals
@@ -827,6 +860,60 @@ export async function fetchTicketsFeuille2(limit = 100) {
     }>(sessionToken, url, "Item_Ticket", false)
 
     return mapTicketsToFeuille2(limited, links)
+  })
+}
+
+const LINKED_ITEMTYPE_LABELS: Record<string, string> = {
+  Computer: "Computer",
+  Monitor: "Monitor",
+  Printer: "Printer",
+}
+
+export async function fetchTicketLinkedItemLabels(ticketId: number): Promise<string[]> {
+  return withSession(async (sessionToken, url) => {
+    const allLinks = await listAllItems<{
+      tickets_id: number
+      itemtype: string
+      items_id: number
+    }>(sessionToken, url, "Item_Ticket", false)
+
+    const ticketLinks = allLinks.filter(
+      (link) => Number(link.tickets_id) === ticketId
+    )
+    if (ticketLinks.length === 0) return []
+
+    const labels: string[] = []
+
+    for (const link of ticketLinks) {
+      const itemtype = String(link.itemtype)
+      const itemsId = Number(link.items_id)
+      const mirror = getAsset(itemtype, itemsId)
+
+      if (mirror?.name?.trim()) {
+        labels.push(mirror.name.trim())
+        continue
+      }
+
+      try {
+        const itemRes = await fetch(`${url}/apirest.php/${itemtype}/${itemsId}`, {
+          headers: {
+            "Content-Type": "application/json",
+            "Session-Token": sessionToken,
+          },
+        })
+        const item = (await itemRes.json()) as { name?: string }
+        if (itemRes.ok && item?.name?.trim()) {
+          labels.push(item.name.trim())
+          continue
+        }
+      } catch {
+        // fallback type label below
+      }
+
+      labels.push(LINKED_ITEMTYPE_LABELS[itemtype] ?? itemtype)
+    }
+
+    return labels
   })
 }
 

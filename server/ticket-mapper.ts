@@ -9,6 +9,12 @@ import {
   TICKET_TYPE,
 } from "./glpi.js"
 
+const ITEMTYPE_LABELS: Record<string, string> = {
+  Computer: "Ordinateur",
+  Monitor: "Moniteur",
+  Printer: "Imprimante",
+}
+
 export type TicketFeuille2Row = {
   id: number
   ref_ticket: number
@@ -58,6 +64,15 @@ function parseTicketContent(content: string) {
   }
 
   return { description, date, heure, priority, urgency, impact, status, itemsInline }
+}
+
+export function parseTicketItemsFromContent(content: string): string[] {
+  const { itemsInline } = parseTicketContent(content)
+  if (!itemsInline) return []
+  return itemsInline
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
 }
 
 function formatGlpiDate(dateStr: string) {
@@ -119,9 +134,11 @@ export function mapTicketsToFeuille2(
     const ticketLinks = linksByTicket.get(id) ?? []
 
     const linkedNames = ticketLinks
-      .map((link) =>
-        assetMap.get(`${link.itemtype}:${link.items_id}`)
-      )
+      .map((link) => {
+        const assetName = assetMap.get(`${link.itemtype}:${link.items_id}`)
+        if (assetName) return assetName
+        return ITEMTYPE_LABELS[link.itemtype] ?? link.itemtype
+      })
       .filter((name): name is string => Boolean(name))
 
     const itemsFromContent = content.itemsInline

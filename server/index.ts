@@ -18,6 +18,7 @@ import {
   getAssetStats,
   getDataDir,
   getKanbanConfig,
+  getTicketMirror,
   getTicketSuperCostSummary,
   listImports,
   resetLocalData,
@@ -31,7 +32,9 @@ import { importBundle } from "./import-service.js"
 import {
   createTicketWithItems,
   computeGlpiCostsByItemType,
+  computeGlpiInterventionsByItemType,
   fetchTicketById,
+  fetchTicketLinkedItemLabels,
   fetchTickets,
   fetchTicketsFeuille2,
   fetchTicketCostsFeuille3,
@@ -41,6 +44,7 @@ import {
   syncAssetsFromGlpi,
   updateTicketStatus,
 } from "./glpi.js"
+import { parseTicketItemsFromContent } from "./ticket-mapper.js"
 
 const app = express()
 const upload = multer({
@@ -210,12 +214,46 @@ app.get("/api/tickets/:id/super-cost", (req, res) => {
 
 app.get("/api/item-costs", async (_req, res) => {
   try {
-    const glpiByType = await computeGlpiCostsByItemType()
-    res.json(listItemCostsReport(glpiByType))
+    const [glpiByType, glpiInterventions] = await Promise.all([
+      computeGlpiCostsByItemType(),
+      computeGlpiInterventionsByItemType(),
+    ])
+    res.json(listItemCostsReport(glpiByType, glpiInterventions))
   } catch {
     res.json(listItemCostsReport({}))
   }
 })
+
+async function resolveCostItemNames(
+  ticketId: number,
+  bodyItems: string[]
+): Promise<string[]> {
+  if (bodyItems.length > 0) return bodyItems
+
+  const mirror = getTicketMirror(ticketId)
+  if (mirror?.items_json) {
+    try {
+      const parsed = JSON.parse(mirror.items_json) as string[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    } catch {
+      // ignore invalid JSON
+    }
+  }
+
+  if (mirror?.content) {
+    const fromContent = parseTicketItemsFromContent(mirror.content)
+    if (fromContent.length > 0) return fromContent
+  }
+
+  try {
+    const fromGlpi = await fetchTicketLinkedItemLabels(ticketId)
+    if (fromGlpi.length > 0) return fromGlpi
+  } catch {
+    // GLPI indisponible — enregistrement sous « — »
+  }
+
+  return []
+}
 
 app.patch("/api/tickets/:id/status", async (req, res) => {
   try {
@@ -238,10 +276,10 @@ app.patch("/api/tickets/:id/status", async (req, res) => {
 
     const ticketId = Number(req.params.id)
     const closeCostBefore = getTicketSuperCostSummary(ticketId)
-    const result = await updateTicketStatus(ticketId, status, comment)
+    const resolvedItems = await resolveCostItemNames(ticketId, items)
 
     if (status === 6 && Number.isFinite(superCost) && superCost > 0) {
-      saveItemSuperCosts(ticketId, items, superCost, "close")
+      saveItemSuperCosts(ticketId, resolvedItems, superCost, "close")
     }
 
     if (status !== 6) {
@@ -257,14 +295,15 @@ app.patch("/api/tickets/:id/status", async (req, res) => {
           Math.round(closeCostBefore.total_cost * reopenPercent) / 100
         if (reopenTotal > 0) {
           const reopenItems =
-            items.length > 0
-              ? items
+            resolvedItems.length > 0
+              ? resolvedItems
               : closeCostBefore.shares.map((share) => share.item_name)
           saveItemSuperCosts(ticketId, reopenItems, reopenTotal, "reopen")
         }
       }
     }
 
+    const result = await updateTicketStatus(ticketId, status, comment)
     res.json(result)
   } catch (error) {
     res.status(502).json({
