@@ -9,16 +9,16 @@ import {
   requireBackoffice,
   verifyBackofficeCode,
 } from "./auth.js"
+import { listItemCostsReport } from "./cost-report.js"
 import {
   collectGlpiTicketIdsFromImports,
-  deleteTicketCloseSuperCosts,
+  deleteLastTicketCloseSuperCosts,
   getAllSettings,
   getAsset,
   getAssetStats,
   getDataDir,
   getKanbanConfig,
   getTicketSuperCostSummary,
-  listItemCostsGrouped,
   listImports,
   resetLocalData,
   saveItemSuperCosts,
@@ -30,6 +30,7 @@ import {
 import { importBundle } from "./import-service.js"
 import {
   createTicketWithItems,
+  computeGlpiCostsByItemType,
   fetchTicketById,
   fetchTickets,
   fetchTicketsFeuille2,
@@ -207,8 +208,13 @@ app.get("/api/tickets/:id/super-cost", (req, res) => {
   res.json(summary)
 })
 
-app.get("/api/item-costs", (_req, res) => {
-  res.json(listItemCostsGrouped())
+app.get("/api/item-costs", async (_req, res) => {
+  try {
+    const glpiByType = await computeGlpiCostsByItemType()
+    res.json(listItemCostsReport(glpiByType))
+  } catch {
+    res.json(listItemCostsReport({}))
+  }
 })
 
 app.patch("/api/tickets/:id/status", async (req, res) => {
@@ -240,7 +246,7 @@ app.patch("/api/tickets/:id/status", async (req, res) => {
 
     if (status !== 6) {
       if (cancelLastCost) {
-        deleteTicketCloseSuperCosts(ticketId)
+        deleteLastTicketCloseSuperCosts(ticketId)
       }
       if (
         Number.isFinite(reopenPercent) &&

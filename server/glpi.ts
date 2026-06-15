@@ -752,6 +752,63 @@ export async function fetchTicketCostsFeuille3(limit = 200) {
   })
 }
 
+export async function computeGlpiCostsByItemType(): Promise<
+  Record<string, number>
+> {
+  const ITEMTYPE_LABELS: Record<string, string> = {
+    Computer: "Ordinateur",
+    Monitor: "Moniteur",
+    Printer: "Imprimante",
+  }
+
+  return withSession(async (sessionToken, url) => {
+    const costs = await listAllItems<Record<string, unknown>>(
+      sessionToken,
+      url,
+      "TicketCost"
+    )
+    const links = await listAllItems<{
+      tickets_id: number
+      itemtype: string
+    }>(sessionToken, url, "Item_Ticket", false)
+
+    const labelsByTicket = new Map<number, string[]>()
+    for (const link of links) {
+      const ticketId = Number(link.tickets_id)
+      if (!ticketId) continue
+      const label =
+        ITEMTYPE_LABELS[String(link.itemtype)] ?? String(link.itemtype)
+      const list = labelsByTicket.get(ticketId) ?? []
+      list.push(label)
+      labelsByTicket.set(ticketId, list)
+    }
+
+    const totals: Record<string, number> = {}
+
+    for (const cost of costs) {
+      const ticketId = Number(cost.tickets_id)
+      const labels = labelsByTicket.get(ticketId)
+      if (!labels?.length) continue
+
+      const costTime = Number(String(cost.cost_time ?? "0").replace(",", "."))
+      const fixed = Number(cost.cost_fixed) || 0
+      const amount = costTime + fixed
+      if (amount <= 0) continue
+
+      const share = amount / labels.length
+      for (const label of labels) {
+        totals[label] = (totals[label] ?? 0) + share
+      }
+    }
+
+    for (const label of Object.keys(totals)) {
+      totals[label] = Math.round(totals[label] * 100) / 100
+    }
+
+    return totals
+  })
+}
+
 export async function fetchTicketsFeuille2(limit = 100) {
   const { mapTicketsToFeuille2 } = await import("./ticket-mapper.js")
 

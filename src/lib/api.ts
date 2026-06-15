@@ -57,12 +57,15 @@ export type TicketCostFeuille3Row = {
   fixed_cost: number
 }
 
-export type ItemCostGroup = {
-  item_name: string
-  entry_count: number
-  last_share: number
-  total_cost: number
+export type ItemCostReportRow = {
+  item: string
+  total_glpi: number
+  total_super_cost: number
+  total_reopen: number
 }
+
+/** @deprecated use ItemCostReportRow */
+export type ItemCostGroup = ItemCostReportRow
 
 export type TicketSuperCostSummary = {
   total_cost: number
@@ -342,7 +345,7 @@ export const api = {
       admin: true,
     }),
 
-  itemCosts: () => request<ItemCostGroup[]>("/item-costs"),
+  itemCosts: () => request<ItemCostReportRow[]>("/item-costs"),
 
   ticketSuperCost: (id: number) =>
     request<TicketSuperCostSummary | null>(`/tickets/${id}/super-cost`),

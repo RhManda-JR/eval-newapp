@@ -248,7 +248,7 @@ export function KanbanPage() {
   const [statusComment, setStatusComment] = useState("")
   const [superCost, setSuperCost] = useState("")
   const [cancelLastCost, setCancelLastCost] = useState(false)
-  const [reopenPercent, setReopenPercent] = useState("10")
+  const [reopenPercent, setReopenPercent] = useState("0")
   const [reopenLastCost, setReopenLastCost] =
     useState<TicketSuperCostSummary | null>(null)
 
@@ -436,7 +436,7 @@ export function KanbanPage() {
     if (requiresReopenDialog(fromStatus, targetStatus)) {
       setPendingReopen({ ticket, toStatus: targetStatus })
       setCancelLastCost(false)
-      setReopenPercent("10")
+      setReopenPercent("0")
       return
     }
 
@@ -471,7 +471,7 @@ export function KanbanPage() {
     })
     setPendingReopen(null)
     setCancelLastCost(false)
-    setReopenPercent("10")
+    setReopenPercent("0")
   }
 
   function formatAmount(value: number) {
@@ -676,7 +676,7 @@ export function KanbanPage() {
           if (!open) {
             setPendingReopen(null)
             setCancelLastCost(false)
-            setReopenPercent("10")
+            setReopenPercent("0")
           }
         }}
       >
@@ -757,7 +757,7 @@ export function KanbanPage() {
               onClick={() => {
                 setPendingReopen(null)
                 setCancelLastCost(false)
-                setReopenPercent("10")
+                setReopenPercent("0")
               }}
             >
               Annuler

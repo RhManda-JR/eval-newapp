@@ -532,13 +532,6 @@ export type ItemSuperCostRow = {
   created_at: string
 }
 
-export type ItemCostGroup = {
-  item_name: string
-  entry_count: number
-  last_share: number
-  total_cost: number
-}
-
 export type SuperCostKind = "close" | "reopen"
 
 export function saveItemSuperCosts(
@@ -553,22 +546,48 @@ export function saveItemSuperCosts(
   const targets = cleaned.length > 0 ? cleaned : ["—"]
 
   const insert = db.prepare(
-    `INSERT INTO item_super_costs (ticket_id, item_name, total_cost, item_count, share_cost, kind)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO item_super_costs (ticket_id, item_name, total_cost, item_count, share_cost, kind, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   )
 
   const tx = db.transaction(() => {
+    const batchAt = new Date().toISOString()
     for (const itemName of targets) {
-      insert.run(ticketId, itemName, totalCost, itemCount, shareCost, kind)
+      insert.run(
+        ticketId,
+        itemName,
+        totalCost,
+        itemCount,
+        shareCost,
+        kind,
+        batchAt
+      )
     }
   })
   tx()
 }
 
-export function deleteTicketCloseSuperCosts(ticketId: number) {
+export function deleteLastTicketCloseSuperCosts(ticketId: number) {
+  const last = db
+    .prepare(
+      `SELECT created_at FROM item_super_costs
+       WHERE ticket_id = ? AND kind = 'close'
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`
+    )
+    .get(ticketId) as { created_at: string } | undefined
+
+  if (!last) return
+
   db.prepare(
-    `DELETE FROM item_super_costs WHERE ticket_id = ? AND kind = 'close'`
-  ).run(ticketId)
+    `DELETE FROM item_super_costs
+     WHERE ticket_id = ? AND kind = 'close' AND created_at = ?`
+  ).run(ticketId, last.created_at)
+}
+
+/** @deprecated use deleteLastTicketCloseSuperCosts */
+export function deleteTicketCloseSuperCosts(ticketId: number) {
+  deleteLastTicketCloseSuperCosts(ticketId)
 }
 
 export type TicketSuperCostSummary = {
@@ -580,14 +599,25 @@ export type TicketSuperCostSummary = {
 export function getTicketSuperCostSummary(
   ticketId: number
 ): TicketSuperCostSummary | null {
+  const last = db
+    .prepare(
+      `SELECT created_at FROM item_super_costs
+       WHERE ticket_id = ? AND kind = 'close'
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`
+    )
+    .get(ticketId) as { created_at: string } | undefined
+
+  if (!last) return null
+
   const rows = db
     .prepare(
       `SELECT item_name, share_cost, total_cost, item_count
        FROM item_super_costs
-       WHERE ticket_id = ? AND kind = 'close'
-       ORDER BY created_at DESC, item_name COLLATE NOCASE`
+       WHERE ticket_id = ? AND kind = 'close' AND created_at = ?
+       ORDER BY item_name COLLATE NOCASE`
     )
-    .all(ticketId) as Pick<
+    .all(ticketId, last.created_at) as Pick<
     ItemSuperCostRow,
     "item_name" | "share_cost" | "total_cost" | "item_count"
   >[]
@@ -602,29 +632,6 @@ export function getTicketSuperCostSummary(
       share_cost: row.share_cost,
     })),
   }
-}
-
-export function listItemCostsGrouped(): ItemCostGroup[] {
-  return db
-    .prepare(
-      `SELECT
-         g.item_name,
-         g.entry_count,
-         g.total_cost,
-         s.share_cost AS last_share
-       FROM (
-         SELECT
-           item_name,
-           COUNT(*) AS entry_count,
-           ROUND(SUM(share_cost), 2) AS total_cost,
-           MAX(id) AS last_id
-         FROM item_super_costs
-         GROUP BY item_name
-       ) g
-       JOIN item_super_costs s ON s.id = g.last_id
-       ORDER BY g.item_name COLLATE NOCASE`
-    )
-    .all() as ItemCostGroup[]
 }
 
 export function resetLocalData() {

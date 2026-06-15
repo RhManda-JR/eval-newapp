@@ -5,14 +5,13 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   api,
-  type ItemCostGroup,
+  type ItemCostReportRow,
   type TicketCostFeuille3Row,
 } from "@/lib/api"
 import { resolveGlpiTicketsListUrl } from "@/lib/glpi-links"
@@ -26,7 +25,7 @@ const GLPI_COLUMNS = [
 
 function formatAmount(value: number) {
   return value.toLocaleString("fr-FR", {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
 }
@@ -41,7 +40,7 @@ function glpiCellValue(
 
 export function BackofficeCostsPage() {
   const [glpiCosts, setGlpiCosts] = useState<TicketCostFeuille3Row[]>([])
-  const [itemCosts, setItemCosts] = useState<ItemCostGroup[]>([])
+  const [itemCosts, setItemCosts] = useState<ItemCostReportRow[]>([])
   const [loading, setLoading] = useState(true)
   const [glpiTicketsUrl, setGlpiTicketsUrl] = useState<string | null>(null)
 
@@ -55,15 +54,13 @@ export function BackofficeCostsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const superTotal = itemCosts.reduce((sum, row) => sum + row.total_cost, 0)
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Coûts</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Super coûts SQLite et coûts GLPI.
+            Synthèse par type d&apos;item et coûts GLPI bruts.
           </p>
         </div>
         {glpiTicketsUrl ? (
@@ -78,38 +75,34 @@ export function BackofficeCostsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Super coûts / vidiny vaovao</CardTitle>
-          <CardDescription>
-            {loading
-              ? "Chargement…"
-              : `${itemCosts.length} élément(s) — total ${formatAmount(superTotal)}`}
-          </CardDescription>
+          <CardTitle>Coûts par item</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <Skeleton className="h-32 w-full" />
           ) : itemCosts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Aucun super coût. Fermez un ticket depuis le Kanban avec un montant
-              saisi.
+              Aucun coût enregistré pour le moment.
             </p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left">
                   <th className="py-2 pr-4 font-medium">Item</th>
-                  <th className="py-2 pr-4 font-medium">Vidiny vaovao</th>
-                  <th className="py-2 pr-4 font-medium">Coût total</th>
-                  <th className="py-2 font-medium">Tickets</th>
+                  <th className="py-2 pr-4 font-medium">Total GLPI</th>
+                  <th className="py-2 pr-4 font-medium">Total super coût</th>
+                  <th className="py-2 font-medium">Total réouverture</th>
                 </tr>
               </thead>
               <tbody>
                 {itemCosts.map((row) => (
-                  <tr key={row.item_name} className="border-b">
-                    <td className="py-2 pr-4">{row.item_name}</td>
-                    <td className="py-2 pr-4">{formatAmount(row.last_share)}</td>
-                    <td className="py-2 pr-4">{formatAmount(row.total_cost)}</td>
-                    <td className="py-2">{row.entry_count}</td>
+                  <tr key={row.item} className="border-b">
+                    <td className="py-2 pr-4">{row.item}</td>
+                    <td className="py-2 pr-4">{formatAmount(row.total_glpi)}</td>
+                    <td className="py-2 pr-4">
+                      {formatAmount(row.total_super_cost)}
+                    </td>
+                    <td className="py-2">{formatAmount(row.total_reopen)}</td>
                   </tr>
                 ))}
               </tbody>
